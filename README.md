@@ -28,9 +28,11 @@ flutter run -d chrome
 - Milestones at desk levels 10, 25, 50, 100, 200, and beyond double that floor's speed. Achievements such as Synergy Achieved, Hostile Takeover, and First Billion pay Gold Tickets once.
 - Themed districts every 10 floors: Basement Dungeon, Corporate Offices, Skyscraper, Cloud Penthouse, Space Station, then Abyssal HQ. The background tint and later monsters change, and a dismissible note announces a new district once.
 - Boss floors every 25 floors. An Audit or Hostile Takeover asks you to raise income before 45 seconds run out. Clearing it pays gold and hires Karen. Missing it returns the gold.
+- Quests open with Floor 3: tap 25 times today, open a floor this week, recruit 3 staff this week. A streak freeze keeps your check-in if you miss a day. You can hold two.
 
 ## Changelog
 
+- Daily and weekly quests, plus a streak freeze so one missed day does not reset the check-in.
 - Boss floors every 25 floors. A failed audit returns the gold. The prize is capped so a huge tower cannot overflow.
 - Themed districts every 10 floors, with a one-time unlock note. Floors past the last theme stay in Abyssal HQ instead of crashing.
 - Milestones and an achievements screen. Ticket rewards are granted once.

@@ -9,6 +9,7 @@ import '../widgets/welcome_back_dialog.dart';
 import 'recruitment_page.dart';
 import 'achievements_page.dart';
 import 'market_page.dart';
+import 'quests_page.dart';
 import 'shop_page.dart';
 import 'weekend_page.dart';
 
@@ -243,6 +244,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-quests'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => QuestsPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Quests'),
               ),
               TextButton(
                 key: const Key('open-achievements'),

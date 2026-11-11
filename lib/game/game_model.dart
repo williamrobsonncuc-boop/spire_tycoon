@@ -110,6 +110,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int tutorialStep = 0;
 
   int loginStreak = 0;
+  int streakFreezes = 1;
+  String questDay = '';
+  String questWeek = '';
+  int tapsToday = 0;
+  int buildsThisWeek = 0;
+  int recruitsThisWeek = 0;
+  bool dailyTapClaimed = false;
+  bool weeklyBuildClaimed = false;
+  bool weeklyRecruitClaimed = false;
   String lastLoginDay = '';
   double pendingLoginGold = 0;
 
@@ -384,6 +393,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _lastActive = now;
     _rollDailyLogin(now);
     _syncWeekend(now);
+    _syncQuests(now);
 
     ready = true;
     await persist();
@@ -407,7 +417,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     final now = _now();
     _syncWeekend(now);
     _rollDailyLogin(now);
+    _syncQuests(now);
   }
+
+  /// Quests start once Floor 3 is open, so the first floors stay simple.
+  bool get questsOpen => highestRunningFloor >= 2;
 
   /// Adds one minute of tower income to this week's local score.
   void fileWeekendReport() {
@@ -461,6 +475,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (lastLoginDay == yesterdayKey(now)) {
       loginStreak += 1;
+    } else if (lastLoginDay.isNotEmpty && streakFreezes > 0) {
+      // A freeze keeps the streak. The player still checks in today.
+      streakFreezes -= 1;
     } else {
       loginStreak = 1;
     }
@@ -503,6 +520,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void tapLobby() {
+    _syncQuests(_now());
+    tapsToday += 1;
     gold = roundMoney(gold + goldPerTap);
     _creditLifetime(goldPerTap.toDouble());
     lastQuip = corporateLines[_quipIndex % corporateLines.length];
@@ -566,6 +585,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     managers[ManagerId.brutus] = copies(ManagerId.brutus) + 1;
+    recruitsThisWeek += 1;
     lastHire = ManagerId.brutus;
     tutorialStep = 4;
     _touch();
@@ -579,6 +599,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     goldTickets -= 1;
     final hire = managerForRoll(roll ?? _random.nextDouble());
     managers[hire] = copies(hire) + 1;
+    recruitsThisWeek += 1;
     lastHire = hire;
     _checkAchievements();
     _touch();
@@ -813,10 +834,59 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     progress.running = true;
     progress.constructionEndsMs = null;
     goldTickets += 1;
+    buildsThisWeek += 1;
     if (grantDiamond) {
       testDiamonds += 1;
     }
     _noteDistrict(index, announce: true);
+  }
+
+  void _syncQuests(DateTime now) {
+    final today = dayKey(now);
+    if (questDay != today) {
+      questDay = today;
+      tapsToday = 0;
+      dailyTapClaimed = false;
+    }
+    final week = weekKey(now).toString();
+    if (questWeek != week) {
+      questWeek = week;
+      buildsThisWeek = 0;
+      recruitsThisWeek = 0;
+      weeklyBuildClaimed = false;
+      weeklyRecruitClaimed = false;
+    }
+  }
+
+  void claimDailyTaps() {
+    if (!questsOpen || tapsToday < 25 || dailyTapClaimed) {
+      return;
+    }
+    dailyTapClaimed = true;
+    gold = roundMoney(gold + 25);
+    _creditLifetime(25);
+    if (streakFreezes < 2) {
+      streakFreezes += 1;
+    }
+    _touch();
+  }
+
+  void claimWeeklyBuild() {
+    if (!questsOpen || buildsThisWeek < 1 || weeklyBuildClaimed) {
+      return;
+    }
+    weeklyBuildClaimed = true;
+    goldTickets += 1;
+    _touch();
+  }
+
+  void claimWeeklyRecruit() {
+    if (!questsOpen || recruitsThisWeek < 3 || weeklyRecruitClaimed) {
+      return;
+    }
+    weeklyRecruitClaimed = true;
+    goldTickets += 1;
+    _touch();
   }
 
   void _rollSleepingOrcs() {
@@ -959,6 +1029,24 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       }
       _sanitizeLoadedNumbers();
       loginStreak = (map['loginStreak'] as num?)?.toInt() ?? 0;
+      streakFreezes = (map['streakFreezes'] as num?)?.toInt() ?? 1;
+      if (streakFreezes < 0) {
+        streakFreezes = 0;
+      }
+      if (streakFreezes > 2) {
+        streakFreezes = 2;
+      }
+      questDay = map['questDay'] as String? ?? '';
+      questWeek = map['questWeek'] as String? ?? '';
+      tapsToday = (map['tapsToday'] as num?)?.toInt() ?? 0;
+      buildsThisWeek = (map['buildsThisWeek'] as num?)?.toInt() ?? 0;
+      recruitsThisWeek = (map['recruitsThisWeek'] as num?)?.toInt() ?? 0;
+      dailyTapClaimed = map['dailyTapClaimed'] == true;
+      weeklyBuildClaimed = map['weeklyBuildClaimed'] == true;
+      weeklyRecruitClaimed = map['weeklyRecruitClaimed'] == true;
+      if (tapsToday < 0) {
+        tapsToday = 0;
+      }
       lastLoginDay = map['lastLoginDay'] as String? ?? '';
       pendingLoginGold = roundMoney(
         (map['pendingLoginGold'] as num?)?.toDouble() ?? 0,
@@ -1005,6 +1093,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       muted = false;
       tutorialStep = 0;
       loginStreak = 0;
+      streakFreezes = 1;
       lastLoginDay = '';
       pendingLoginGold = 0;
       weekendWeek = 0;
@@ -1077,6 +1166,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'muted': muted ? 1 : 0,
       'tutorial': tutorialStep,
       'loginStreak': loginStreak,
+      'streakFreezes': streakFreezes,
+      'questDay': questDay,
+      'questWeek': questWeek,
+      'tapsToday': tapsToday,
+      'buildsThisWeek': buildsThisWeek,
+      'recruitsThisWeek': recruitsThisWeek,
+      'dailyTapClaimed': dailyTapClaimed,
+      'weeklyBuildClaimed': weeklyBuildClaimed,
+      'weeklyRecruitClaimed': weeklyRecruitClaimed,
       'lastLoginDay': lastLoginDay,
       'pendingLoginGold': pendingLoginGold,
       'weekendWeek': weekendWeek,

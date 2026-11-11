@@ -592,6 +592,12 @@ void main() {
 
     now = now.add(const Duration(days: 3));
     game.prepareCalendar();
+    // The free streak freeze absorbs this gap.
+    expect(game.loginStreak, 2);
+    expect(game.streakFreezes, 0);
+
+    now = now.add(const Duration(days: 3));
+    game.prepareCalendar();
     expect(game.loginStreak, 1);
   });
 
@@ -737,6 +743,35 @@ void main() {
       expect(game.gold, greaterThanOrEqualTo(0));
     },
   );
+
+  test('quests pay once and a streak freeze forgives one missed day', () async {
+    var now = DateTime.utc(2026, 11, 10, 9);
+    final game = GameModel(enableIdleTicks: false, now: () => now);
+    addTearDown(game.dispose);
+    await game.load();
+    expect(game.streakFreezes, 1);
+    expect(game.questsOpen, isFalse);
+    for (var i = 0; i < 25; i++) {
+      game.tapLobby();
+    }
+    game.claimDailyTaps();
+    expect(game.dailyTapClaimed, isFalse);
+
+    game.floors[1] = FloorProgress(running: true);
+    game.floors[2] = FloorProgress(running: true);
+    expect(game.questsOpen, isTrue);
+    game.claimDailyTaps();
+    expect(game.dailyTapClaimed, isTrue);
+    expect(game.streakFreezes, 2);
+    game.claimDailyTaps();
+    expect(game.streakFreezes, 2);
+
+    now = now.add(const Duration(days: 3));
+    final streak = game.loginStreak;
+    game.prepareCalendar();
+    expect(game.loginStreak, streak);
+    expect(game.streakFreezes, 1);
+  });
 }
 
 void _useTallWindow(WidgetTester tester) {
