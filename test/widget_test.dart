@@ -696,6 +696,47 @@ void main() {
     game.skipBuildWithDiamond(10);
     expect(game.districtNotice, isNull);
   });
+
+  test(
+    'a boss floor refunds a failed audit and pays a rare manager on success',
+    () {
+      expect(isBossFloor(24), isTrue);
+      expect(isBossFloor(49), isTrue);
+      expect(isBossFloor(23), isFalse);
+      expect(bossChallengeName(24), 'Audit');
+      expect(bossChallengeName(49), 'Hostile Takeover');
+
+      var now = DateTime.utc(2026, 8, 1, 12);
+      final game = GameModel(enableIdleTicks: false, now: () => now);
+      addTearDown(game.dispose);
+      game.floors[0] = FloorProgress(running: true);
+      for (var index = 1; index < 24; index++) {
+        game.floors[index] = FloorProgress(running: true, sleeping: true);
+      }
+      game.gold = 1e15;
+      final before = game.gold;
+      game.startBuild(24);
+      expect(game.bossFloor, 24);
+      expect(game.isRunning(24), isFalse);
+      final during = game.gold;
+      expect(during, lessThan(before));
+
+      now = now.add(const Duration(seconds: 46));
+      game.advanceOneSecond();
+      expect(game.bossFloor, isNull);
+      expect(game.gold, closeTo(before, 1));
+      expect(game.copies(ManagerId.karen), 0);
+
+      game.gold = 1e15;
+      game.startBuild(24);
+      game.floors[0]!.level = 50;
+      game.advanceOneSecond();
+      expect(game.isRunning(24), isTrue);
+      expect(game.copies(ManagerId.karen), 1);
+      expect(game.gold.isFinite, isTrue);
+      expect(game.gold, greaterThanOrEqualTo(0));
+    },
+  );
 }
 
 void _useTallWindow(WidgetTester tester) {

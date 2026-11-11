@@ -131,6 +131,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int highestDistrict = 0;
   String? districtNotice;
 
+  /// The boss attempt currently on the clock, if any.
+  int? bossFloor;
+  int? bossEndsMs;
+  double bossTarget = 0;
+  double _bossStake = 0;
+
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
   String? lastQuip;
@@ -309,7 +315,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   bool canBuild(int index) {
-    if (index <= 0 || isRunning(index) || isBuilding(index)) {
+    if (bossFloor != null ||
+        index <= 0 ||
+        isRunning(index) ||
+        isBuilding(index)) {
       return false;
     }
     if (!isRunning(index - 1)) {
@@ -370,6 +379,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     // Floors that finished while the game was closed open now.
     // They were not included in the payout above.
+    _resolveBoss(now);
     _finishConstruction(now);
     _lastActive = now;
     _rollDailyLogin(now);
@@ -514,6 +524,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (gold + 0.001 < cost) {
       return;
     }
+    if (isBossFloor(index)) {
+      _startBoss(index, cost);
+      return;
+    }
     gold = roundMoney(gold - cost);
     floors[index] = FloorProgress(
       constructionEndsMs:
@@ -631,6 +645,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     pendingCompliance = 0;
     pendingOfflineSeconds = 0;
     _slowCharge = 0;
+    bossFloor = null;
+    bossEndsMs = null;
+    bossTarget = 0;
+    _bossStake = 0;
     floors
       ..clear()
       ..[0] = FloorProgress(running: true);
@@ -653,6 +671,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     final now = _now();
     prepareCalendar();
+    _resolveBoss(now);
     _finishConstruction(now);
     _produce(const Duration(seconds: 1));
     _rollClogs();
@@ -712,6 +731,67 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (complianceGain != 0) {
       compliance = roundMoney(compliance + complianceGain);
     }
+  }
+
+  void _startBoss(int index, double cost) {
+    if (bossFloor != null) {
+      return;
+    }
+    gold = roundMoney(gold - cost);
+    _bossStake = cost;
+    bossFloor = index;
+    bossEndsMs = _now().millisecondsSinceEpoch + 45 * 1000;
+    final current = goldPerSecond;
+    final base = current.isFinite && current > 0 ? current : 0;
+    bossTarget = positiveCost(base * 1.5 + 1);
+    floors[index] = FloorProgress();
+    _touch();
+  }
+
+  int? get bossSecondsLeft {
+    final ends = bossEndsMs;
+    if (bossFloor == null || ends == null) {
+      return null;
+    }
+    final leftMs = ends - _now().millisecondsSinceEpoch;
+    if (leftMs <= 0) {
+      return 0;
+    }
+    return (leftMs / 1000).ceil();
+  }
+
+  void _resolveBoss(DateTime now) {
+    final index = bossFloor;
+    final ends = bossEndsMs;
+    if (index == null || ends == null) {
+      return;
+    }
+    final success = goldPerSecond + 0.0001 >= bossTarget;
+    if (!success && now.millisecondsSinceEpoch < ends) {
+      return;
+    }
+    if (success) {
+      final reward = bossTarget * 30;
+      final paid = reward.isFinite && reward > 0
+          ? (reward > 1e12 ? 1e12 : reward)
+          : 0.0;
+      gold = roundMoney(gold + paid);
+      _creditLifetime(paid);
+      floors[index] = FloorProgress(running: true);
+      managers[ManagerId.karen] = copies(ManagerId.karen) + 1;
+      lastHire = ManagerId.karen;
+      celebration =
+          '${bossChallengeName(index)} cleared. Karen joined the staff.';
+      _noteDistrict(index, announce: true);
+      goldTickets += 1;
+    } else {
+      gold = roundMoney(gold + _bossStake);
+      floors.remove(index);
+    }
+    bossFloor = null;
+    bossEndsMs = null;
+    bossTarget = 0;
+    _bossStake = 0;
   }
 
   void _finishConstruction(DateTime now) {
@@ -858,6 +938,20 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       districtNotice = storedNotice is String && storedNotice.isNotEmpty
           ? storedNotice
           : null;
+      final storedBoss = (map['bossFloor'] as num?)?.toInt();
+      bossFloor = storedBoss != null && storedBoss >= 0 ? storedBoss : null;
+      final storedBossEnds = (map['bossEndsMs'] as num?)?.toInt();
+      bossEndsMs = storedBossEnds != null && storedBossEnds > 0
+          ? storedBossEnds
+          : null;
+      bossTarget = roundMoney((map['bossTarget'] as num?)?.toDouble() ?? 0);
+      _bossStake = roundMoney((map['bossStake'] as num?)?.toDouble() ?? 0);
+      if (bossFloor == null || bossEndsMs == null) {
+        bossFloor = null;
+        bossEndsMs = null;
+        bossTarget = 0;
+        _bossStake = 0;
+      }
       for (final entry in floors.entries) {
         if (entry.value.running) {
           _noteDistrict(entry.key, announce: false);
@@ -923,6 +1017,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       celebration = null;
       highestDistrict = 0;
       districtNotice = null;
+      bossFloor = null;
+      bossEndsMs = null;
+      bossTarget = 0;
+      _bossStake = 0;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -990,6 +1088,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'achievements': claimedAchievements.toList(),
       'highestDistrict': highestDistrict,
       'districtNotice': districtNotice,
+      'bossFloor': bossFloor,
+      'bossEndsMs': bossEndsMs,
+      'bossTarget': bossTarget,
+      'bossStake': _bossStake,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,

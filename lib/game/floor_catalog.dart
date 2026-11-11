@@ -237,6 +237,15 @@ FloorRecipe floorRecipe(int index) {
 
 FloorKind floorKind(int index) => floorRecipe(index).kind;
 
+/// Floor 25, 50, 75, and so on. Floor 1 is not a boss.
+bool isBossFloor(int index) => index >= 24 && (index + 1) % 25 == 0;
+
+/// Odd bosses are audits. Even bosses are hostile takeovers. Same rules.
+String bossChallengeName(int index) {
+  final number = (index + 1) ~/ 25;
+  return number.isOdd ? 'Audit' : 'Hostile Takeover';
+}
+
 /// Gold (or the average gold, for the slow floor) at upgrade level 0.
 double floorBaseGold(int index) {
   if (floorKind(index) == FloorKind.compliance) {

@@ -87,7 +87,9 @@ class FloorCard extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             _UpgradeButton(game: game, index: index),
-          ] else if (progress.isBuilding)
+          ] else if (game.bossFloor == index)
+            _BossBanner(game: game, index: index)
+          else if (progress.isBuilding)
             _BuildingBanner(game: game, index: index)
           else
             _BuildButton(
@@ -243,6 +245,50 @@ class _LobbyTapState extends State<_LobbyTap>
   }
 }
 
+class _BossBanner extends StatelessWidget {
+  const _BossBanner({required this.game, required this.index});
+
+  final GameModel game;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final left = game.bossSecondsLeft ?? 0;
+    return Container(
+      key: Key('boss-floor-$index'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: navy,
+        borderRadius: BorderRadius.circular(cornerRadius),
+      ),
+      child: Column(
+        children: [
+          Text(
+            bossChallengeName(index),
+            style: const TextStyle(
+              color: cream,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Reach ${formatNumber(game.bossTarget)} gold per second. You are at ${formatNumber(game.goldPerSecond)}.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: cream, fontSize: 14, height: 1.3),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${formatBuildTime(left)} left. If you miss it, the gold is returned.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: cyan, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BuildButton extends StatelessWidget {
   const _BuildButton({
     required this.game,
@@ -260,9 +306,13 @@ class _BuildButton extends StatelessWidget {
     final affordable = game.canBuild(index);
     final background = affordable ? emerald : slate;
     final textColor = affordable ? cream : cream.withValues(alpha: 0.55);
+    final boss = isBossFloor(index);
     final String detail;
     if (!previousReady) {
       detail = 'Build the floor below first';
+    } else if (boss) {
+      detail =
+          '${bossChallengeName(index)}. Cost ${formatNumber(cost)} gold. Reach a higher income within 45s. Fail and the gold comes back.';
     } else {
       detail =
           'Cost ${formatNumber(cost)} gold · ${formatBuildTime(game.constructionSeconds(index))}';
@@ -285,7 +335,7 @@ class _BuildButton extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                'Build floor',
+                boss ? 'Start ${bossChallengeName(index)}' : 'Build floor',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 18,
