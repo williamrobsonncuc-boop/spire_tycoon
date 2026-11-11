@@ -103,6 +103,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// When true, the office stays quiet. Saved with the rest of the game.
   bool muted = false;
 
+  /// 0 = appointment, 1 = hire intern, 2 = build floor 2, 3 = free briefcase, 4 = done.
+  int tutorialStep = 0;
+
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
   String? lastQuip;
@@ -315,6 +318,14 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void acceptAppointment() {
+    if (tutorialStep != 0) {
+      return;
+    }
+    tutorialStep = 1;
+    _touch();
+  }
+
   void toggleMute() {
     muted = !muted;
     _touch();
@@ -324,6 +335,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     gold = roundMoney(gold + goldPerTap);
     lastQuip = corporateLines[_quipIndex % corporateLines.length];
     _quipIndex += 1;
+    if (tutorialStep == 1) {
+      tutorialStep = 2;
+    }
     _touch();
   }
 
@@ -343,6 +357,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       constructionEndsMs:
           _now().millisecondsSinceEpoch + constructionSeconds(index) * 1000,
     );
+    if (index == 1 && tutorialStep == 2) {
+      tutorialStep = 3;
+    }
     _touch();
   }
 
@@ -357,6 +374,17 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     gold = roundMoney(gold - cost);
     progress.level += 1;
+    _touch();
+  }
+
+  /// The first-day briefcase. Always Brutus, and it does not cost a ticket.
+  void openWelcomeBriefcase() {
+    if (tutorialStep != 3) {
+      return;
+    }
+    managers[ManagerId.brutus] = copies(ManagerId.brutus) + 1;
+    lastHire = ManagerId.brutus;
+    tutorialStep = 4;
     _touch();
   }
 
@@ -575,6 +603,16 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       testDiamonds = (map['diamonds'] as num?)?.toInt() ?? 0;
       equity = (map['equity'] as num?)?.toInt() ?? 0;
       muted = (map['muted'] as num?) == 1;
+      final storedTutorial = (map['tutorial'] as num?)?.toInt();
+      final deskLevelForTutorial = (map['deskLevel'] as num?)?.toInt() ?? 0;
+      if (storedTutorial != null) {
+        tutorialStep = storedTutorial;
+      } else if (gold > 0 || deskLevelForTutorial > 0) {
+        // Older saves already played. Don't drop the first-day script on them.
+        tutorialStep = 4;
+      } else {
+        tutorialStep = 0;
+      }
       managers.clear();
       final rawManagers = map['managers'];
       if (rawManagers is Map) {
@@ -612,6 +650,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (version < 2 && deskLevel != null) {
         lobby.level = deskLevel;
       }
+      if (storedTutorial == null && floors.length > 1) {
+        tutorialStep = 4;
+      }
     } catch (_) {
       gold = 0;
       compliance = 0;
@@ -621,6 +662,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       equity = 0;
       managers.clear();
       muted = false;
+      tutorialStep = 0;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -653,6 +695,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'diamonds': testDiamonds,
       'equity': equity,
       'muted': muted ? 1 : 0,
+      'tutorial': tutorialStep,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,
