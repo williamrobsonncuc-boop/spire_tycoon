@@ -133,7 +133,7 @@ class RecruitmentPage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      '${card.name} ×${game.copies(card.id)} · ${rarityLabel(card.rarity)}\n${card.effect}',
+                      '${card.name} · ${game.copies(card.id)} stars · ${rarityLabel(card.rarity)}\n${card.effect}\nA sixth copy becomes a Gold Ticket. Stars stop at 5.',
                       style: const TextStyle(
                         color: cream,
                         fontSize: 14,

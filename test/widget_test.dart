@@ -772,6 +772,27 @@ void main() {
     expect(game.loginStreak, streak);
     expect(game.streakFreezes, 1);
   });
+
+  test(
+    'a sixth manager star becomes a ticket and a full set adds 5 percent',
+    () {
+      final game = GameModel(enableIdleTicks: false);
+      addTearDown(game.dispose);
+      game.floors[0] = FloorProgress(running: true);
+      game.managers[ManagerId.gary] = 5;
+      game.goldTickets = 1;
+      game.openBriefcase(roll: 0.1);
+      expect(game.copies(ManagerId.gary), 5);
+      expect(game.goldTickets, 1);
+
+      final before = game.goldRateFor(0);
+      for (final name in districtAt(0).monsters) {
+        game.discoveredCreatures.add(name);
+      }
+      expect(completedDistrictSets(game.discoveredCreatures), 1);
+      expect(game.goldRateFor(0), closeTo(before * 1.05, 0.001));
+    },
+  );
 }
 
 void _useTallWindow(WidgetTester tester) {

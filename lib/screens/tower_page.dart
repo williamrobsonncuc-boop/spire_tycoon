@@ -8,6 +8,7 @@ import '../widgets/restructure_dialog.dart';
 import '../widgets/welcome_back_dialog.dart';
 import 'recruitment_page.dart';
 import 'achievements_page.dart';
+import 'collection_page.dart';
 import 'market_page.dart';
 import 'quests_page.dart';
 import 'shop_page.dart';
@@ -244,6 +245,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-collection'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => CollectionPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Codex'),
               ),
               TextButton(
                 key: const Key('open-quests'),

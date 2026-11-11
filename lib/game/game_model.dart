@@ -132,6 +132,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   double lifetimeGold = 0;
   int marketWins = 0;
   final Set<String> claimedAchievements = {};
+  final Set<String> discoveredCreatures = {};
 
   /// Set when an upgrade crosses 10, 25, 50... Cleared when the player taps it.
   String? celebration;
@@ -196,7 +197,17 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int get restructuringEquity =>
       highestRunningFloor < 1 ? 0 : highestRunningFloor;
 
-  int copies(ManagerId id) => managers[id] ?? 0;
+  /// Stars, capped at 5. A sixth copy becomes a Gold Ticket instead.
+  int copies(ManagerId id) {
+    final count = managers[id] ?? 0;
+    if (count < 0) {
+      return 0;
+    }
+    return count > 5 ? 5 : count;
+  }
+
+  double get collectionBonus =>
+      1 + 0.05 * completedDistrictSets(discoveredCreatures);
 
   /// Gary's +2% speed per copy.
   double get speedBonus => 1 + 0.02 * copies(ManagerId.gary);
@@ -262,7 +273,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         goldMultiplier *
         speedBonus *
         equityMultiplier *
-        milestoneSpeed(progress.level);
+        milestoneSpeed(progress.level) *
+        collectionBonus;
     // Gary's first copy doubles the forge. Brutus buffs every heavy floor.
     if (index == 1 && copies(ManagerId.gary) > 0) {
       rate *= 2;
@@ -598,7 +610,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     goldTickets -= 1;
     final hire = managerForRoll(roll ?? _random.nextDouble());
-    managers[hire] = copies(hire) + 1;
+    if (copies(hire) >= 5) {
+      goldTickets += 1;
+    } else {
+      managers[hire] = copies(hire) + 1;
+    }
     recruitsThisWeek += 1;
     lastHire = hire;
     _checkAchievements();
@@ -799,7 +815,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       gold = roundMoney(gold + paid);
       _creditLifetime(paid);
       floors[index] = FloorProgress(running: true);
-      managers[ManagerId.karen] = copies(ManagerId.karen) + 1;
+      if (copies(ManagerId.karen) >= 5) {
+        goldTickets += 1;
+      } else {
+        managers[ManagerId.karen] = copies(ManagerId.karen) + 1;
+      }
+      discoveredCreatures.add(creatureOnFloor(index));
       lastHire = ManagerId.karen;
       celebration =
           '${bossChallengeName(index)} cleared. Karen joined the staff.';
@@ -839,6 +860,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       testDiamonds += 1;
     }
     _noteDistrict(index, announce: true);
+    discoveredCreatures.add(creatureOnFloor(index));
   }
 
   void _syncQuests(DateTime now) {
@@ -1025,6 +1047,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       for (final entry in floors.entries) {
         if (entry.value.running) {
           _noteDistrict(entry.key, announce: false);
+          discoveredCreatures.add(creatureOnFloor(entry.key));
         }
       }
       _sanitizeLoadedNumbers();
@@ -1076,6 +1099,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
           }
         }
       }
+      discoveredCreatures.clear();
+      final rawCreatures = map['discovered'];
+      if (rawCreatures is List) {
+        for (final name in rawCreatures) {
+          if (name is String && name.isNotEmpty) {
+            discoveredCreatures.add(name);
+          }
+        }
+      }
       if (loginStreak < 0) {
         loginStreak = 0;
       }
@@ -1103,6 +1135,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       lifetimeGold = 0;
       marketWins = 0;
       claimedAchievements.clear();
+      discoveredCreatures.clear();
       celebration = null;
       highestDistrict = 0;
       districtNotice = null;
@@ -1184,6 +1217,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'lifetimeGold': lifetimeGold,
       'marketWins': marketWins,
       'achievements': claimedAchievements.toList(),
+      'discovered': discoveredCreatures.toList(),
       'highestDistrict': highestDistrict,
       'districtNotice': districtNotice,
       'bossFloor': bossFloor,

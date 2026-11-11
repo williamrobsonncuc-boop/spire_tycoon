@@ -30,6 +30,7 @@ class FloorRecipe {
     required this.emoji,
     required this.blurb,
     required this.kind,
+    required this.creature,
   });
 
   final int index;
@@ -37,6 +38,7 @@ class FloorRecipe {
   final String emoji;
   final String blurb;
   final FloorKind kind;
+  final String creature;
 
   int get number => index + 1;
 
@@ -50,6 +52,7 @@ const List<FloorRecipe> _designedFloors = [
     emoji: '👺',
     blurb: 'A goblin receptionist. Tap for gold. The desk also earns gold every second.',
     kind: FloorKind.gold,
+    creature: 'Goblin',
   ),
   FloorRecipe(
     index: 1,
@@ -57,6 +60,7 @@ const List<FloorRecipe> _designedFloors = [
     emoji: '🐂',
     blurb: 'Infrastructure Foundry. Minotaurs hammer cursed blades. High volume, low margin: it pays well, and upgrades get expensive fast.',
     kind: FloorKind.gold,
+    creature: 'Minotaur',
   ),
   FloorRecipe(
     index: 2,
@@ -64,6 +68,7 @@ const List<FloorRecipe> _designedFloors = [
     emoji: '🧪',
     blurb: 'Witches and plague doctors bottle mana espresso. About 3% chance each second that the line clogs. Tap the floor to clear it.',
     kind: FloorKind.clog,
+    creature: 'Witch',
   ),
   FloorRecipe(
     index: 3,
@@ -71,6 +76,7 @@ const List<FloorRecipe> _designedFloors = [
     emoji: '🧟',
     blurb: 'Liches archive soul data. They pay a lump sum every 15 seconds instead of a steady trickle.',
     kind: FloorKind.slowBurst,
+    creature: 'Lich',
   ),
   FloorRecipe(
     index: 4,
@@ -78,6 +84,7 @@ const List<FloorRecipe> _designedFloors = [
     emoji: '👻',
     blurb: 'Banshees produce Compliance Points. Spend them on policies that permanently raise gold from every floor.',
     kind: FloorKind.compliance,
+    creature: 'Banshee',
   ),
 ];
 
@@ -232,10 +239,28 @@ FloorRecipe floorRecipe(int index) {
     blurb:
         '${district.name}. A later department bottling $product. Same jobs, bigger numbers.',
     kind: FloorKind.gold,
+    creature: monster,
   );
 }
 
 FloorKind floorKind(int index) => floorRecipe(index).kind;
+
+String creatureOnFloor(int index) => floorRecipe(index).creature;
+
+/// Every monster named in one district theme.
+bool districtSetComplete(int districtIndex, Set<String> discovered) {
+  return districtAt(districtIndex).monsters.every(discovered.contains);
+}
+
+int completedDistrictSets(Set<String> discovered) {
+  var count = 0;
+  for (var i = 0; i < districtThemes.length; i++) {
+    if (districtSetComplete(i, discovered)) {
+      count += 1;
+    }
+  }
+  return count;
+}
 
 /// Floor 25, 50, 75, and so on. Floor 1 is not a boss.
 bool isBossFloor(int index) => index >= 24 && (index + 1) % 25 == 0;
