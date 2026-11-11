@@ -19,3 +19,4 @@ flutter run -d chrome
 - Briefcase recruitment spends Gold Tickets (one per finished floor). The odds stay on the screen: Common 75%, Rare 18%, Epic 6%, Legendary 1%. Staff are Gary, Karen, Brutus, Vlad, and the Corporate Overlord Lich. TEST diamonds are a practice currency, not a real purchase. Shareholder Equity is reserved for restructuring.
 - Construction can be finished with 1 TEST diamond, or a practice sponsor memo can cut the remaining time in half. Alchemy lines can clog, and other floors can get a sleeping orc. Tap the warning to clear it.
 - Corporate Restructuring resets gold, floors, tickets, policies, and staff. You keep Shareholder Equity. Each point adds 10% gold, including on the next endless tower. TEST diamonds are kept.
+- Tapping the receptionist pops a corporate line, such as "Can we circle back to this blood ritual after stand-up?"

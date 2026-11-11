@@ -28,7 +28,7 @@ class WelcomeBackDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Welcome back',
+              'Welcome back, CEO',
               key: Key('welcome-back'),
               style: TextStyle(
                 color: cream,
