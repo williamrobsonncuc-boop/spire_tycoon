@@ -7,6 +7,7 @@ import '../widgets/floor_card.dart';
 import '../widgets/restructure_dialog.dart';
 import '../widgets/welcome_back_dialog.dart';
 import 'recruitment_page.dart';
+import 'achievements_page.dart';
 import 'market_page.dart';
 import 'shop_page.dart';
 import 'weekend_page.dart';
@@ -101,6 +102,31 @@ class _TowerPageState extends State<TowerPage> {
                       child: Column(
                         children: [
                           _TowerHeader(game: game),
+                          if (game.celebration != null) ...[
+                            const SizedBox(height: 8),
+                            Material(
+                              color: emerald,
+                              borderRadius: BorderRadius.circular(cornerRadius),
+                              child: InkWell(
+                                key: const Key('celebration'),
+                                borderRadius: BorderRadius.circular(
+                                  cornerRadius,
+                                ),
+                                onTap: game.dismissCelebration,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Text(
+                                    game.celebration!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: cream,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           if (game.tutorialStep > 0 &&
                               game.tutorialStep < 4) ...[
                             const SizedBox(height: 8),
@@ -192,6 +218,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-achievements'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => AchievementsPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Trophies'),
               ),
               TextButton(
                 key: const Key('open-market'),

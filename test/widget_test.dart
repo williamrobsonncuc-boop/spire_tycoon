@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:spire_tycoon/game/achievements.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
 import 'package:spire_tycoon/game/market.dart';
@@ -399,7 +400,10 @@ void main() {
     game.openBriefcase(roll: 0.1);
     expect(game.lastHire, ManagerId.gary);
     expect(game.copies(ManagerId.gary), 1);
-    expect(game.goldTickets, 0);
+    // Spending the ticket hires Gary. Vlad was already on staff, so
+    // Synergy Achieved pays that ticket back.
+    expect(game.goldTickets, 1);
+    expect(game.claimedAchievements, contains('synergy'));
     expect(game.constructionSeconds(1), floorBuildSeconds(1));
     game.managers[ManagerId.lich] = 1;
     expect(game.constructionSeconds(1), (floorBuildSeconds(1) * 0.5).round());
@@ -637,6 +641,33 @@ void main() {
     game.fightMarket();
     expect(game.canFightMarket, isFalse);
     expect(game.gold, gold);
+  });
+
+  test('milestones double speed and achievements pay tickets once', () {
+    expect(milestoneSpeed(9), 1);
+    expect(milestoneSpeed(10), 2);
+    expect(milestoneSpeed(25), 4);
+    expect(crossedMilestone(9, 10), isTrue);
+    expect(crossedMilestone(10, 11), isFalse);
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true, level: 9);
+    game.gold = 100000000;
+    game.upgradeFloor(0);
+    expect(game.lobbyLevel, 10);
+    expect(game.celebration, contains('Speed doubled'));
+    expect(game.goldRateFor(0), closeTo(0.2 * 11 * 2, 0.01));
+
+    game.managers[ManagerId.gary] = 1;
+    game.managers[ManagerId.karen] = 1;
+    game.lifetimeGold = 1000000000;
+    final tickets = game.goldTickets;
+    game.tapLobby();
+    expect(game.claimedAchievements, containsAll(['synergy', 'billion']));
+    expect(game.goldTickets, tickets + 6);
+    game.tapLobby();
+    expect(game.goldTickets, tickets + 6);
   });
 }
 

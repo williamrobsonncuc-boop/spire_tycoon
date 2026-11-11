@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'achievements.dart';
 import 'dialogue.dart';
 import 'floor_catalog.dart';
 import 'formulas.dart';
@@ -117,6 +118,14 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   String weekendFiledDay = '';
   String marketFoughtDay = '';
   MarketFight? lastMarketFight;
+
+  /// Gold ever earned, including gold you have already spent.
+  double lifetimeGold = 0;
+  int marketWins = 0;
+  final Set<String> claimedAchievements = {};
+
+  /// Set when an upgrade crosses 10, 25, 50... Cleared when the player taps it.
+  String? celebration;
 
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
@@ -233,7 +242,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         (1 + progress.level) *
         goldMultiplier *
         speedBonus *
-        equityMultiplier;
+        equityMultiplier *
+        milestoneSpeed(progress.level);
     // Gary's first copy doubles the forge. Brutus buffs every heavy floor.
     if (index == 1 && copies(ManagerId.gary) > 0) {
       rate *= 2;
@@ -252,7 +262,25 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (floorKind(index) != FloorKind.compliance) {
       return 0;
     }
-    return floorBaseCompliance(index) * (1 + progress.level);
+    return floorBaseCompliance(index) *
+        (1 + progress.level) *
+        milestoneSpeed(progress.level);
+  }
+
+  void _creditLifetime(double amount) {
+    if (amount.isNaN || amount.isInfinite || amount <= 0) {
+      return;
+    }
+    final next = lifetimeGold + amount;
+    lifetimeGold = next.isNaN || next.isInfinite || next > 1e300 ? 1e300 : next;
+  }
+
+  void dismissCelebration() {
+    if (celebration == null) {
+      return;
+    }
+    celebration = null;
+    notifyListeners();
   }
 
   bool canBuild(int index) {
@@ -373,7 +401,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     lastMarketFight = fight;
     if (fight.won && fight.reward > 0) {
       gold = roundMoney(gold + fight.reward);
+      _creditLifetime(fight.reward);
+      marketWins += 1;
     }
+    _checkAchievements();
     _touch();
   }
 
@@ -381,8 +412,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (pendingLoginGold <= 0) {
       return;
     }
+    _creditLifetime(pendingLoginGold);
     gold = roundMoney(gold + pendingLoginGold);
     pendingLoginGold = 0;
+    _checkAchievements();
     _touch();
   }
 
@@ -436,6 +469,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void tapLobby() {
     gold = roundMoney(gold + goldPerTap);
+    _creditLifetime(goldPerTap.toDouble());
     lastQuip = corporateLines[_quipIndex % corporateLines.length];
     _quipIndex += 1;
     if (tutorialStep == 1) {
@@ -476,7 +510,14 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     gold = roundMoney(gold - cost);
+    final previous = progress.level;
     progress.level += 1;
+    if (crossedMilestone(previous, progress.level)) {
+      final floorNumber = index + 1;
+      celebration =
+          'Floor $floorNumber reached level ${progress.level}. Speed doubled.';
+    }
+    _checkAchievements();
     _touch();
   }
 
@@ -500,6 +541,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     final hire = managerForRoll(roll ?? _random.nextDouble());
     managers[hire] = copies(hire) + 1;
     lastHire = hire;
+    _checkAchievements();
     _touch();
   }
 
@@ -590,6 +632,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _produce(const Duration(seconds: 1));
     _rollClogs();
     _rollSleepingOrcs();
+    _checkAchievements();
     _lastActive = now;
     notifyListeners();
     unawaited(persist());
@@ -600,7 +643,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     final factor = doubled ? 2.0 : 1.0;
-    gold = roundMoney(gold + pendingOfflineGold * factor);
+    final payout = pendingOfflineGold * factor;
+    _creditLifetime(payout);
+    gold = roundMoney(gold + payout);
     compliance = roundMoney(compliance + pendingCompliance * factor);
     pendingOfflineGold = 0;
     pendingCompliance = 0;
@@ -635,8 +680,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         goldGain += goldRateFor(index) * seconds;
       }
     }
-    if (goldGain != 0) {
+    if (goldGain > 0) {
       gold = roundMoney(gold + goldGain);
+      _creditLifetime(goldGain);
     }
     if (complianceGain != 0) {
       compliance = roundMoney(compliance + complianceGain);
@@ -783,6 +829,27 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       weekendScore = (map['weekendScore'] as num?)?.toInt() ?? 0;
       weekendFiledDay = map['weekendFiledDay'] as String? ?? '';
       marketFoughtDay = map['marketFoughtDay'] as String? ?? '';
+      final storedLifetime = (map['lifetimeGold'] as num?)?.toDouble();
+      lifetimeGold = storedLifetime ?? roundMoney(gold);
+      if (lifetimeGold.isNaN || lifetimeGold.isInfinite || lifetimeGold < 0) {
+        lifetimeGold = 0;
+      }
+      if (lifetimeGold > 1e300) {
+        lifetimeGold = 1e300;
+      }
+      marketWins = (map['marketWins'] as num?)?.toInt() ?? 0;
+      if (marketWins < 0) {
+        marketWins = 0;
+      }
+      claimedAchievements.clear();
+      final rawAchievements = map['achievements'];
+      if (rawAchievements is List) {
+        for (final id in rawAchievements) {
+          if (id is String && achievementById(id) != null) {
+            claimedAchievements.add(id);
+          }
+        }
+      }
       if (loginStreak < 0) {
         loginStreak = 0;
       }
@@ -806,6 +873,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       weekendScore = 0;
       weekendFiledDay = '';
       marketFoughtDay = '';
+      lifetimeGold = 0;
+      marketWins = 0;
+      claimedAchievements.clear();
+      celebration = null;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -868,6 +939,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'weekendScore': weekendScore,
       'weekendFiledDay': weekendFiledDay,
       'marketFoughtDay': marketFoughtDay,
+      'lifetimeGold': lifetimeGold,
+      'marketWins': marketWins,
+      'achievements': claimedAchievements.toList(),
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,
@@ -884,9 +958,29 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _touch() {
+    _checkAchievements();
     _lastActive = _now();
     notifyListeners();
     unawaited(persist());
+  }
+
+  void _checkAchievements() {
+    final unlocked = <String, bool>{
+      'synergy': managers.values.where((count) => count > 0).length >= 2,
+      'takeover': marketWins >= 1,
+      'billion': lifetimeGold >= 1000000000,
+      'floor10': highestRunningFloor >= 9,
+      'desk25': lobbyLevel >= 25,
+    };
+    for (final item in achievementCatalog) {
+      if (claimedAchievements.contains(item.id)) {
+        continue;
+      }
+      if (unlocked[item.id] == true) {
+        claimedAchievements.add(item.id);
+        goldTickets += item.tickets;
+      }
+    }
   }
 
   void _startIdleTimer() {
