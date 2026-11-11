@@ -56,6 +56,17 @@ class _SpireTycoonAppState extends State<SpireTycoonApp> {
       title: 'Spire Tycoon',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      builder: (context, child) {
+        return ColoredBox(
+          color: navy,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: pageMaxWidth),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       home: TowerPage(game: _game),
     );
   }

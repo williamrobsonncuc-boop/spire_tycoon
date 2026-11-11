@@ -101,7 +101,6 @@ void main() {
       await tester.tap(find.byKey(const Key('goblin')));
       await tester.pump();
     }
-
     expect(find.text('12.5'), findsOneWidget);
     expect(find.byKey(const Key('combo-meter')), findsOneWidget);
     expect(find.byKey(const Key('dialogue-bubble')), findsOneWidget);
@@ -1240,6 +1239,32 @@ void main() {
       expect(game.restructuringEquity, 19);
     },
   );
+
+  testWidgets('the tower stays readable on a phone and a desktop window', (
+    tester,
+  ) async {
+    Future<void> check(Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      final game = GameModel(enableIdleTicks: false);
+      addTearDown(game.dispose);
+      await tester.pumpWidget(SpireTycoonApp(key: ValueKey(size), game: game));
+      await _pumpUntilReady(tester);
+      await _acceptAppointment(tester);
+      await tester.pump();
+      expect(find.byKey(const Key('gold-amount')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('open-achievements')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('empty-achievements')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    }
+
+    await check(const Size(360, 740));
+    await check(const Size(1280, 800));
+  });
 }
 
 class _QueueRandom implements Random {

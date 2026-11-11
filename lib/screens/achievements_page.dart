@@ -30,6 +30,14 @@ class AchievementsPage extends StatelessWidget {
                   'Hit these once. The ticket reward is not repeated.',
                   style: TextStyle(color: cream, fontSize: 15, height: 1.35),
                 ),
+                if (game.claimedAchievements.isEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'None claimed yet. The list below is still ahead of you.',
+                    key: Key('empty-achievements'),
+                    style: TextStyle(color: cyan, fontSize: 15, height: 1.35),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 for (final item in achievementCatalog)
                   _AchievementRow(

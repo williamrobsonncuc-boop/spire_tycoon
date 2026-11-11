@@ -54,6 +54,14 @@ class MarketPage extends StatelessWidget {
                         : 'Campaign already run today',
                   ),
                 ),
+                if (fight == null) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No campaign yet today. One run, whenever you want it.',
+                    key: Key('empty-market'),
+                    style: TextStyle(color: cyan, fontSize: 16, height: 1.35),
+                  ),
+                ],
                 if (fight != null) ...[
                   const SizedBox(height: 16),
                   Text(

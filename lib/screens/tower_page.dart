@@ -4,6 +4,7 @@ import '../game/events.dart';
 import '../game/formulas.dart';
 import '../game/game_model.dart';
 import '../theme/app_colors.dart';
+import '../widgets/animated_amount.dart';
 import '../widgets/floor_card.dart';
 import '../widgets/restructure_dialog.dart';
 import '../widgets/welcome_back_dialog.dart';
@@ -160,7 +161,7 @@ class _TowerNotes extends StatelessWidget {
       children: [
         if (game.districtNotice != null) ...[
           Material(
-            color: const Color(0xFF0F172A),
+            color: ink,
             borderRadius: BorderRadius.circular(cornerRadius),
             child: InkWell(
               key: const Key('district-notice'),
@@ -410,9 +411,9 @@ class _TowerHeader extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            formatNumber(game.gold),
-            key: const Key('gold-amount'),
+          AnimatedAmount(
+            value: game.gold,
+            amountKey: const Key('gold-amount'),
             style: const TextStyle(
               color: cyan,
               fontSize: 36,
@@ -455,7 +456,7 @@ class _AppointmentNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: const Color(0xF20F172A),
+      color: ink.withValues(alpha: 0.95),
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(

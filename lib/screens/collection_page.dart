@@ -34,6 +34,14 @@ class CollectionPage extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                if (game.discoveredCreatures.isEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'You have not met anyone yet. Open a floor and the silhouettes fill in.',
+                    key: Key('empty-codex'),
+                    style: TextStyle(color: cyan, fontSize: 15, height: 1.35),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 for (var i = 0; i < districtThemes.length; i++)
                   _DistrictSet(
