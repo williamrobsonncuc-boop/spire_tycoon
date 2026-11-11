@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
+import 'package:spire_tycoon/game/market.dart';
 import 'package:spire_tycoon/game/weekend.dart';
 import 'package:spire_tycoon/game/game_model.dart';
 import 'package:spire_tycoon/game/sound_board.dart';
@@ -607,7 +608,35 @@ void main() {
       const Offset(0, -400),
     );
     await tester.pump();
+    await tester.tap(find.byKey(const Key('open-market')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('run-market-fight')));
+    await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  test('a market campaign stays finite and cannot be farmed the same day', () {
+    final weak = runMarketFight(power: 0, seed: 1);
+    expect(weak.log.length, 6);
+    expect(weak.reward.isFinite, isTrue);
+    expect(weak.reward, greaterThanOrEqualTo(0));
+
+    final broken = runMarketFight(power: double.nan, seed: 4);
+    expect(broken.reward.isFinite, isTrue);
+    expect(broken.reward, greaterThanOrEqualTo(0));
+
+    final huge = runMarketFight(power: double.maxFinite, seed: 2);
+    expect(huge.reward, lessThanOrEqualTo(1000000000000));
+
+    final now = DateTime.utc(2026, 11, 11, 10);
+    final game = GameModel(enableIdleTicks: false, now: () => now);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true);
+    game.fightMarket();
+    final gold = game.gold;
+    game.fightMarket();
+    expect(game.canFightMarket, isFalse);
+    expect(game.gold, gold);
   });
 }
 

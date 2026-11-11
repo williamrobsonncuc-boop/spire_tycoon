@@ -9,6 +9,7 @@ import 'dialogue.dart';
 import 'floor_catalog.dart';
 import 'formulas.dart';
 import 'managers.dart';
+import 'market.dart';
 import 'weekend.dart';
 
 /// One JSON blob in shared_preferences. On Chrome that is localStorage.
@@ -114,6 +115,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int weekendWeek = 0;
   int weekendScore = 0;
   String weekendFiledDay = '';
+  String marketFoughtDay = '';
+  MarketFight? lastMarketFight;
 
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
@@ -352,6 +355,25 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     weekendScore = addScore(weekendScore, weekendReportPoints(goldPerSecond));
     weekendFiledDay = dayKey(now);
+    _touch();
+  }
+
+  bool get canFightMarket => marketFoughtDay != dayKey(_now());
+
+  /// Runs today's boardroom campaign. A second tap the same day does nothing.
+  void fightMarket() {
+    if (!canFightMarket) {
+      return;
+    }
+    final fight = runMarketFight(
+      power: goldPerSecond,
+      seed: weekKey(_now()) + loginStreak + goldPerTap,
+    );
+    marketFoughtDay = dayKey(_now());
+    lastMarketFight = fight;
+    if (fight.won && fight.reward > 0) {
+      gold = roundMoney(gold + fight.reward);
+    }
     _touch();
   }
 
@@ -760,6 +782,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       weekendWeek = (map['weekendWeek'] as num?)?.toInt() ?? 0;
       weekendScore = (map['weekendScore'] as num?)?.toInt() ?? 0;
       weekendFiledDay = map['weekendFiledDay'] as String? ?? '';
+      marketFoughtDay = map['marketFoughtDay'] as String? ?? '';
       if (loginStreak < 0) {
         loginStreak = 0;
       }
@@ -782,6 +805,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       weekendWeek = 0;
       weekendScore = 0;
       weekendFiledDay = '';
+      marketFoughtDay = '';
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -843,6 +867,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'weekendWeek': weekendWeek,
       'weekendScore': weekendScore,
       'weekendFiledDay': weekendFiledDay,
+      'marketFoughtDay': marketFoughtDay,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,
