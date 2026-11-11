@@ -303,25 +303,30 @@ void main() {
     game.floors[1] = FloorProgress(running: true);
     game.floors[12] = FloorProgress(running: true);
     game.gold = 5000;
+    expect(game.restructuringEquity, 0);
+    game.restructure();
+    expect(game.equity, 0);
+    expect(game.gold, 5000);
+    game.floors[19] = FloorProgress(running: true);
     game.goldTickets = 3;
     game.testDiamonds = 4;
     game.managers[ManagerId.gary] = 2;
     game.policyLevel = 2;
 
-    expect(game.restructuringEquity, 12);
+    expect(game.restructuringEquity, 19);
     game.restructure();
 
-    expect(game.equity, 12);
+    expect(game.equity, 19);
     expect(game.gold, 0);
     expect(game.goldTickets, 0);
     expect(game.testDiamonds, 4);
     expect(game.copies(ManagerId.gary), 0);
     expect(game.lobbyLevel, 0);
     expect(game.isRunning(0), isTrue);
-    expect(game.isRunning(12), isFalse);
+    expect(game.isRunning(19), isFalse);
     expect(game.isRunning(1), isFalse);
-    // 12 equity points is +120% gold, so the lobby's 0.2/sec becomes 0.44.
-    expect(game.goldPerSecond, closeTo(0.44, 0.001));
+    // 19 equity points is +190% gold, so the lobby's 0.2/sec becomes 0.58.
+    expect(game.goldPerSecond, closeTo(0.58, 0.001));
     expect(game.restructures, 1);
   });
 
@@ -403,6 +408,7 @@ void main() {
     // 120s * 0.2 gold/sec * 4 from one Vlad.
     expect(game.pendingOfflineGold, 96);
     expect(game.copies(ManagerId.vlad), 1);
+    game.floors[4] = FloorProgress(running: true);
     game.openBriefcase(roll: 0.1);
     expect(game.lastHire, ManagerId.gary);
     expect(game.copies(ManagerId.gary), 1);
@@ -432,7 +438,7 @@ void main() {
     expect(find.textContaining('Rare 18%'), findsOneWidget);
     expect(find.textContaining('Epic 6%'), findsOneWidget);
     expect(find.textContaining('Legendary 1%'), findsOneWidget);
-    expect(find.text('Need 1 Gold Ticket'), findsOneWidget);
+    expect(find.text('Briefcases open at Floor 5'), findsOneWidget);
   });
 
   testWidgets('the practice shop shows prices and grants TEST diamonds', (
@@ -831,6 +837,7 @@ void main() {
       final game = GameModel(enableIdleTicks: false);
       addTearDown(game.dispose);
       game.floors[0] = FloorProgress(running: true);
+      game.floors[4] = FloorProgress(running: true);
       game.managers[ManagerId.gary] = 5;
       game.goldTickets = 1;
       game.openBriefcase(roll: 0.1);
@@ -866,7 +873,10 @@ void main() {
     game.equity = 100;
     game.buyResearch(1);
     expect(game.offlineResearchCap, const Duration(hours: 9));
+    game.floors[19] = FloorProgress(running: true);
+    game.gold = 40;
     game.restructure();
+    expect(game.gold, 0);
     expect(game.researchLevel(0), 1);
     expect(game.researchLevel(1), 1);
     game.researchLevels[0] = -4;
@@ -974,6 +984,7 @@ void main() {
       addTearDown(reset.dispose);
       reset.floors[0] = FloorProgress(running: true);
       reset.floors[2] = FloorProgress(running: true);
+      reset.floors[19] = FloorProgress(running: true);
       reset.advanceOneSecond();
       expect(reset.officeEvent, OfficeEvent.outage);
       reset.restructure();
@@ -1019,6 +1030,10 @@ void main() {
       addTearDown(game.dispose);
       game.floors[0] = FloorProgress(running: true);
       game.floors[1] = FloorProgress(running: true);
+      expect(game.prestigeOpen, isFalse);
+      game.restructure();
+      expect(game.restructures, 0);
+      game.floors[19] = FloorProgress(running: true);
       expect(game.nextPrestigePreview, contains('Brass'));
       game.restructure();
       expect(game.restructures, 1);
@@ -1116,13 +1131,13 @@ void main() {
     expect(game.netWorthHistory.length, 40);
 
     game.equity = 0;
-    game.floors[1] = FloorProgress(running: true);
+    game.floors[19] = FloorProgress(running: true);
     game.restructure();
     expect(game.floorsBuilt, 1);
     expect(game.playSeconds, 45);
     expect(game.netWorthHistory.length, 40);
-    expect(game.equity, 1);
-    expect(game.netWorth, 1000);
+    expect(game.equity, 19);
+    expect(game.netWorth, 19000);
 
     SharedPreferences.setMockInitialValues({
       saveKey: jsonEncode({
@@ -1180,6 +1195,48 @@ void main() {
     expect(find.byKey(const Key('net-worth-chart')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  test(
+    'early systems wait for their floors, and the tutorial briefcase does not',
+    () {
+      final game = GameModel(enableIdleTicks: false);
+      addTearDown(game.dispose);
+      game.floors[0] = FloorProgress(running: true);
+      game.goldTickets = 1;
+      expect(game.questsOpen, isFalse);
+      expect(game.recruitmentOpen, isFalse);
+      expect(game.researchOpen, isFalse);
+      expect(game.prestigeOpen, isFalse);
+      game.openBriefcase(roll: 0.1);
+      expect(game.goldTickets, 1);
+      expect(game.lastHire, isNull);
+
+      game.tutorialStep = 3;
+      game.openWelcomeBriefcase();
+      expect(game.copies(ManagerId.brutus), 1);
+      expect(game.tutorialStep, 4);
+
+      game.floors[2] = FloorProgress(running: true);
+      expect(game.questsOpen, isTrue);
+      expect(game.recruitmentOpen, isFalse);
+
+      game.floors[4] = FloorProgress(running: true);
+      expect(game.recruitmentOpen, isTrue);
+      game.openBriefcase(roll: 0.1);
+      expect(game.lastHire, ManagerId.gary);
+      // Brutus was already hired, so Synergy Achieved pays the ticket back.
+      expect(game.goldTickets, 1);
+      expect(game.claimedAchievements, contains('synergy'));
+
+      game.floors[9] = FloorProgress(running: true);
+      expect(game.researchOpen, isTrue);
+      expect(game.prestigeOpen, isFalse);
+
+      game.floors[19] = FloorProgress(running: true);
+      expect(game.prestigeOpen, isTrue);
+      expect(game.restructuringEquity, 19);
+    },
+  );
 }
 
 class _QueueRandom implements Random {

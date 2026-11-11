@@ -35,9 +35,11 @@ flutter run -d chrome
 - Each restructuring unlocks something that stays: a cosmetic skin, Night Shift floors that pay 50% more, an auto-upgrade toggle, then a second skin. The dialog previews the next reward. Equity still adds 10% gold per point.
 - Taps can crit for ×10. The chance is on the lobby (5%, plus 1% per Heavier Taps level). Tapping again within 2 seconds builds a combo, up to about ×2. A crit shakes the receptionist. One tap never pays more than 1T gold.
 - The stats screen shows lifetime gold, floors built, time played, and a net-worth chart. Net worth is wallet gold plus 1,000 per Shareholder Equity point. The chart keeps the latest 40 points.
+- Unlock pacing: quests at Floor 3, briefcases at Floor 5, research at Floor 10, restructuring at Floor 20. The first-day briefcase still opens during the tutorial. Odds stay on the recruitment screen before you can hire.
 
 ## Changelog
 
+- Unlock pacing. Quests, briefcases, research, and restructuring wait for Floors 3, 5, 10, and 20. A briefcase opened too early does not spend the ticket, and the tutorial briefcase still hires Brutus.
 - Stats screen. Lifetime gold, floors built, and time played stay after a restructuring. A broken chart point is skipped, and the history cannot grow past 40 points.
 - Tap crits and combos. The crit chance is shown on the lobby, a 2 second pause resets the combo, and a huge desk cannot crit into infinity.
 - Restructuring rewards. The first reset unlocks a skin, the second unlocks Night Shift floors, the third unlocks auto-upgrade, and the fourth unlocks another skin. A locked skin in a save is ignored, and the count cannot go below zero or above 100.

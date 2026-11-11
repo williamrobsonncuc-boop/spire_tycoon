@@ -217,9 +217,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     return highest;
   }
 
-  /// Equity you would earn by restructuring. The lobby alone is not enough.
-  int get restructuringEquity =>
-      highestRunningFloor < 1 ? 0 : highestRunningFloor;
+  /// Equity you would earn by restructuring. Floor 20 is the first time it pays.
+  int get restructuringEquity => prestigeOpen ? highestRunningFloor : 0;
 
   /// How many times this tower has been restructured. Unlocks stay.
   int restructures = 0;
@@ -271,6 +270,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Research opens with floor 10 so the early tower is not a menu of systems.
   bool get researchOpen => highestRunningFloor >= 9;
+
+  /// Briefcases open at floor 5. The first-day briefcase is separate.
+  bool get recruitmentOpen => highestRunningFloor >= 4;
+
+  /// Restructuring waits until floor 20 so the first tower is quick to learn.
+  bool get prestigeOpen => highestRunningFloor >= 19;
 
   int researchLevel(int branch) {
     if (branch < 0 || branch >= researchLevels.length) {
@@ -856,7 +861,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Spends one Gold Ticket and hires whoever the roll lands on.
   void openBriefcase({double? roll}) {
-    if (goldTickets < 1) {
+    if (!recruitmentOpen || goldTickets < 1) {
       return;
     }
     goldTickets -= 1;

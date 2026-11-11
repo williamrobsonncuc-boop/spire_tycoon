@@ -24,7 +24,8 @@ class RecruitmentPage extends StatelessWidget {
         child: ListenableBuilder(
           listenable: game,
           builder: (context, _) {
-            final canOpen = game.goldTickets >= 1;
+            final unlocked = game.recruitmentOpen;
+            final canOpen = unlocked && game.goldTickets >= 1;
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -92,7 +93,9 @@ class RecruitmentPage extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Text(
-                        canOpen
+                        !unlocked
+                            ? 'Briefcases open at Floor 5'
+                            : canOpen
                             ? 'Open briefcase (1 Gold Ticket)'
                             : 'Need 1 Gold Ticket',
                         textAlign: TextAlign.center,

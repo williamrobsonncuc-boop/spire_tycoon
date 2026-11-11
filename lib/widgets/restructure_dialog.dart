@@ -40,7 +40,7 @@ class RestructureDialog extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                can ? 'Sign away this run for $gain Shareholder Equity.' : 'Open at least the Dragon Forge before you can restructure.',
+                can ? 'Sign away this run for $gain Shareholder Equity.' : 'Reach Floor 20 before you can restructure. The first tower stays quick to learn.',
                 style: const TextStyle(
                   color: cream,
                   fontSize: 16,
