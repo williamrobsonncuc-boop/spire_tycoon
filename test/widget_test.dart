@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
+import 'package:spire_tycoon/game/weekend.dart';
 import 'package:spire_tycoon/game/game_model.dart';
 import 'package:spire_tycoon/game/sound_board.dart';
 import 'package:spire_tycoon/game/managers.dart';
@@ -446,6 +447,167 @@ void main() {
     await tester.tap(find.byKey(const Key('test-buy-intern')));
     await tester.pump();
     expect(game.testDiamonds, 5);
+  });
+
+  test('huge, tiny, and broken numbers stay finite', () {
+    expect(formatNumber(double.nan), '0');
+    expect(formatNumber(double.infinity), '0');
+    expect(formatNumber(-1500), '-1.5K');
+    expect(formatNumber(double.maxFinite), isNot('0'));
+    expect(deskUpgradeCost(5000).isFinite, isTrue);
+    expect(deskUpgradeCost(5000), greaterThan(deskUpgradeCost(10)));
+    expect(floorBuildCost(400).isFinite, isTrue);
+    expect(floorBuildCost(400), greaterThan(0));
+    expect(floorBuildSeconds(400), 2000000000);
+    expect(
+      offlineEarnings(
+        goldPerSecond: double.nan,
+        away: const Duration(hours: 2),
+      ),
+      0,
+    );
+    expect(
+      offlineEarnings(goldPerSecond: -5, away: const Duration(hours: 2)),
+      0,
+    );
+    expect(
+      offlineEarnings(goldPerSecond: 1e20, away: const Duration(hours: 9)),
+      offlineEarnings(goldPerSecond: 1e20, away: const Duration(hours: 8)),
+    );
+    expect(rarityForRoll(double.nan), ManagerRarity.common);
+    expect(roundMoney(-12), 0);
+    expect(roundMoney(double.nan), 0);
+  });
+
+  test('a corrupted or negative save still opens on Floor 1', () async {
+    SharedPreferences.setMockInitialValues({saveKey: '{'});
+    final broken = GameModel(enableIdleTicks: false);
+    addTearDown(broken.dispose);
+    await broken.load();
+    expect(broken.gold, 0);
+    expect(broken.isRunning(0), isTrue);
+
+    final past = DateTime.utc(2026, 1, 2, 12);
+    SharedPreferences.setMockInitialValues({
+      saveKey: jsonEncode({
+        'version': 2,
+        'gold': -40,
+        'compliance': -8,
+        'tickets': -3,
+        'deskLevel': 2,
+        'floors': [
+          [0, 2, 1, 0],
+          'nope',
+          [1],
+        ],
+        'lastActiveMs': past.millisecondsSinceEpoch,
+      }),
+    });
+    final game = GameModel(enableIdleTicks: false, now: () => past);
+    addTearDown(game.dispose);
+    await game.load();
+    expect(game.gold, 0);
+    expect(game.goldTickets, 0);
+    expect(game.lobbyLevel, 2);
+    expect(game.isRunning(0), isTrue);
+  });
+
+  test('fifty quick taps add fifty gold', () async {
+    SharedPreferences.setMockInitialValues({});
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await game.load();
+    for (var i = 0; i < 50; i++) {
+      game.tapLobby();
+    }
+    expect(game.gold, 50);
+  });
+
+  test('a short background gap is paid and a long one is capped', () async {
+    var now = DateTime.utc(2026, 5, 2, 12);
+    SharedPreferences.setMockInitialValues({});
+    final game = GameModel(enableIdleTicks: false, now: () => now);
+    addTearDown(game.dispose);
+    await game.load();
+    now = now.add(const Duration(seconds: 20));
+    game.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect(game.pendingOfflineGold, 0);
+    expect(game.gold, closeTo(4, 0.05));
+
+    SharedPreferences.setMockInitialValues({});
+    var later = DateTime.utc(2026, 5, 3, 12);
+    final away = GameModel(enableIdleTicks: false, now: () => later);
+    addTearDown(away.dispose);
+    await away.load();
+    final goldBefore = away.gold;
+    later = later.add(const Duration(hours: 9));
+    away.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect(away.gold, goldBefore);
+    expect(away.pendingOfflineGold, closeTo(0.2 * 8 * 3600, 0.5));
+  });
+
+  test('Saturday files one report and the board is a local stand-in', () async {
+    final saturday = DateTime.utc(2026, 11, 14, 15);
+    SharedPreferences.setMockInitialValues({});
+    final game = GameModel(enableIdleTicks: false, now: () => saturday);
+    addTearDown(game.dispose);
+    await game.load();
+    expect(isWeekend(saturday), isTrue);
+    expect(game.canFileWeekendReport, isTrue);
+    game.fileWeekendReport();
+    final score = game.weekendScore;
+    expect(score, greaterThan(0));
+    game.fileWeekendReport();
+    expect(game.weekendScore, score);
+    final board = weekendBoard(week: game.weekendWeek, playerScore: score);
+    expect(board.where((row) => row.standIn).length, 4);
+    expect(board.any((row) => row.name.contains('you')), isTrue);
+
+    final monday = DateTime.utc(2026, 11, 16, 9);
+    final closed = GameModel(enableIdleTicks: false, now: () => monday);
+    addTearDown(closed.dispose);
+    await closed.load();
+    expect(closed.canFileWeekendReport, isFalse);
+  });
+
+  test('the daily streak grows, then resets after a missed day', () async {
+    var now = DateTime.utc(2026, 11, 11, 9);
+    final game = GameModel(enableIdleTicks: false, now: () => now);
+    addTearDown(game.dispose);
+    await game.load();
+    expect(game.loginStreak, 1);
+    expect(game.pendingLoginGold, 10);
+    game.collectLoginBonus();
+    expect(game.gold, 10);
+
+    now = now.add(const Duration(days: 1));
+    game.prepareCalendar();
+    expect(game.loginStreak, 2);
+    expect(game.pendingLoginGold, 20);
+
+    now = now.add(const Duration(days: 3));
+    game.prepareCalendar();
+    expect(game.loginStreak, 1);
+  });
+
+  testWidgets('a narrow phone width does not overflow', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
+    await tester.pump();
+    await tester.drag(
+      find.byKey(const Key('tower-list')),
+      const Offset(0, -400),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 }
 

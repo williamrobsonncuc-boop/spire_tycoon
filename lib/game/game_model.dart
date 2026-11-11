@@ -9,6 +9,7 @@ import 'dialogue.dart';
 import 'floor_catalog.dart';
 import 'formulas.dart';
 import 'managers.dart';
+import 'weekend.dart';
 
 /// One JSON blob in shared_preferences. On Chrome that is localStorage.
 const String saveKey = 'spire_tycoon_save_v1';
@@ -106,6 +107,14 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// 0 = appointment, 1 = hire intern, 2 = build floor 2, 3 = free briefcase, 4 = done.
   int tutorialStep = 0;
 
+  int loginStreak = 0;
+  String lastLoginDay = '';
+  double pendingLoginGold = 0;
+
+  int weekendWeek = 0;
+  int weekendScore = 0;
+  String weekendFiledDay = '';
+
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
   String? lastQuip;
@@ -178,7 +187,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     return seconds < 1 ? 1 : seconds;
   }
 
-  double get policyCost => roundMoney((8 * pow(1.55, policyLevel)).toDouble());
+  double get policyCost => positiveCost(8 * safePow(1.55, policyLevel));
 
   /// Average gold per second, including the necromancy floor's lumps.
   double get goldPerSecond {
@@ -307,6 +316,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     // They were not included in the payout above.
     _finishConstruction(now);
     _lastActive = now;
+    _rollDailyLogin(now);
+    _syncWeekend(now);
 
     ready = true;
     await persist();
@@ -316,6 +327,67 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _startIdleTimer();
     _listenForBackground();
     notifyListeners();
+  }
+
+  bool get canFileWeekendReport {
+    final now = _now();
+    return isWeekend(now) &&
+        weekendWeek == weekKey(now) &&
+        weekendFiledDay != dayKey(now);
+  }
+
+  /// Updates the daily streak and the weekend week. Safe to call often.
+  void prepareCalendar() {
+    final now = _now();
+    _syncWeekend(now);
+    _rollDailyLogin(now);
+  }
+
+  /// Adds one minute of tower income to this week's local score.
+  void fileWeekendReport() {
+    final now = _now();
+    _syncWeekend(now);
+    if (!isWeekend(now) || weekendFiledDay == dayKey(now)) {
+      return;
+    }
+    weekendScore = addScore(weekendScore, weekendReportPoints(goldPerSecond));
+    weekendFiledDay = dayKey(now);
+    _touch();
+  }
+
+  void collectLoginBonus() {
+    if (pendingLoginGold <= 0) {
+      return;
+    }
+    gold = roundMoney(gold + pendingLoginGold);
+    pendingLoginGold = 0;
+    _touch();
+  }
+
+  void _rollDailyLogin(DateTime now) {
+    final today = dayKey(now);
+    if (lastLoginDay == today) {
+      return;
+    }
+    if (lastLoginDay == yesterdayKey(now)) {
+      loginStreak += 1;
+    } else {
+      loginStreak = 1;
+    }
+    if (loginStreak < 1) {
+      loginStreak = 1;
+    }
+    lastLoginDay = today;
+    pendingLoginGold = roundMoney(10.0 * loginStreak);
+  }
+
+  void _syncWeekend(DateTime now) {
+    final week = weekKey(now);
+    if (weekendWeek != week) {
+      weekendWeek = week;
+      weekendScore = 0;
+      weekendFiledDay = '';
+    }
   }
 
   void acceptAppointment() {
@@ -491,6 +563,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     final now = _now();
+    prepareCalendar();
     _finishConstruction(now);
     _produce(const Duration(seconds: 1));
     _rollClogs();
@@ -646,9 +719,25 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       floors.clear();
       if (version >= 2 && map['floors'] is List) {
         for (final entry in map['floors'] as List) {
-          final tuple = entry as List;
-          final index = (tuple[0] as num).toInt();
-          floors[index] = FloorProgress.fromTuple(tuple);
+          if (entry is! List || entry.length < 4) {
+            continue;
+          }
+          try {
+            final index = (entry[0] as num).toInt();
+            if (index < 0 || index > 100000) {
+              continue;
+            }
+            final progress = FloorProgress.fromTuple(entry);
+            if (progress.level < 0) {
+              progress.level = 0;
+            }
+            if (progress.level > 100000) {
+              progress.level = 100000;
+            }
+            floors[index] = progress;
+          } catch (_) {
+            // One bad floor should not throw away the rest of the save.
+          }
         }
       }
       // Version 1 only knew about the lobby desk.
@@ -662,6 +751,21 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (storedTutorial == null && floors.length > 1) {
         tutorialStep = 4;
       }
+      _sanitizeLoadedNumbers();
+      loginStreak = (map['loginStreak'] as num?)?.toInt() ?? 0;
+      lastLoginDay = map['lastLoginDay'] as String? ?? '';
+      pendingLoginGold = roundMoney(
+        (map['pendingLoginGold'] as num?)?.toDouble() ?? 0,
+      );
+      weekendWeek = (map['weekendWeek'] as num?)?.toInt() ?? 0;
+      weekendScore = (map['weekendScore'] as num?)?.toInt() ?? 0;
+      weekendFiledDay = map['weekendFiledDay'] as String? ?? '';
+      if (loginStreak < 0) {
+        loginStreak = 0;
+      }
+      if (weekendScore < 0) {
+        weekendScore = 0;
+      }
     } catch (_) {
       gold = 0;
       compliance = 0;
@@ -672,10 +776,38 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       managers.clear();
       muted = false;
       tutorialStep = 0;
+      loginStreak = 0;
+      lastLoginDay = '';
+      pendingLoginGold = 0;
+      weekendWeek = 0;
+      weekendScore = 0;
+      weekendFiledDay = '';
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
       _lastActive = now;
+    }
+  }
+
+  void _sanitizeLoadedNumbers() {
+    gold = roundMoney(gold);
+    compliance = roundMoney(compliance);
+    pendingOfflineGold = roundMoney(pendingOfflineGold);
+    pendingCompliance = roundMoney(pendingCompliance);
+    if (goldTickets < 0) {
+      goldTickets = 0;
+    }
+    if (testDiamonds < 0) {
+      testDiamonds = 0;
+    }
+    if (equity < 0) {
+      equity = 0;
+    }
+    if (policyLevel < 0) {
+      policyLevel = 0;
+    }
+    if (pendingOfflineSeconds < 0) {
+      pendingOfflineSeconds = 0;
     }
   }
 
@@ -705,6 +837,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'equity': equity,
       'muted': muted ? 1 : 0,
       'tutorial': tutorialStep,
+      'loginStreak': loginStreak,
+      'lastLoginDay': lastLoginDay,
+      'pendingLoginGold': pendingLoginGold,
+      'weekendWeek': weekendWeek,
+      'weekendScore': weekendScore,
+      'weekendFiledDay': weekendFiledDay,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,
@@ -753,6 +891,22 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       final now = _now();
       final away = now.difference(_lastActive ?? now);
+      // A clock jump backwards should not mint gold or a huge debt.
+      if (away.isNegative) {
+        _lastActive = now;
+        unawaited(persist());
+        return;
+      }
+      // Under 30 seconds, pay the gap quietly. The welcome note is for
+      // a real absence, still capped at 8 hours.
+      if (away < offlineMinimum) {
+        _finishConstruction(now);
+        _produce(away);
+        _lastActive = now;
+        notifyListeners();
+        unawaited(persist());
+        return;
+      }
       final earnedGold =
           offlineEarnings(goldPerSecond: goldPerSecond, away: away) *
           offlineBonus;

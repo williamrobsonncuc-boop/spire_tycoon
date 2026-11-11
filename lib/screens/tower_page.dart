@@ -8,6 +8,7 @@ import '../widgets/restructure_dialog.dart';
 import '../widgets/welcome_back_dialog.dart';
 import 'recruitment_page.dart';
 import 'shop_page.dart';
+import 'weekend_page.dart';
 
 /// The whole spire. The list is lazy: Flutter only builds cards you can see,
 /// and scrolling near the bottom reveals more generated floors.
@@ -190,6 +191,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-weekend'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => WeekendPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Weekend'),
               ),
               TextButton(
                 key: const Key('open-shop'),
