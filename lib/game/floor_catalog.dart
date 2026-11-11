@@ -324,28 +324,33 @@ double floorBaseCompliance(int index) {
 
 /// Cost to open a floor. Floor 1 is already built, so it is free.
 ///
-/// Later floors follow cost = 80 × 1.75^index, so the spire gets
-/// steep quickly and never runs out of floors to buy.
+/// Floors 2–13 step by 1.48 so a new floor is a short save. From Floor 14
+/// the step is 3.2, which is what makes Floor 20 about an hour away.
 double floorBuildCost(int index) {
   if (index <= 0) {
     return 0;
   }
-  return positiveCost(80 * safePow(1.75, index));
+  if (index <= 12) {
+    return positiveCost(80 * safePow(1.48, index));
+  }
+  final hinge = 80 * safePow(1.48, 12);
+  return positiveCost(hinge * safePow(4.2, index - 12));
 }
 
 /// How long construction takes, in seconds.
 ///
-/// The timer grows with the floor, then stops at about 68 years so a very
-/// high floor still has a number Dart can store.
+/// The first floors are a short wait. Later ones stretch, then stop at
+/// 3 minutes so a very high floor is a coffee break, not a month.
 int floorBuildSeconds(int index) {
   if (index <= 0) {
     return 0;
   }
-  final raw = 10 * safePow(1.42, index);
-  if (raw >= 2000000000) {
-    return 2000000000;
+  final raw = 8 * safePow(1.2, index);
+  if (raw >= 180) {
+    return 180;
   }
-  return raw.round();
+  final seconds = raw.round();
+  return seconds < 8 ? 8 : seconds;
 }
 
 /// Price of the next upgrade on a floor that is already running.

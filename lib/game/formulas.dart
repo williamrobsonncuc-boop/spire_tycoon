@@ -36,6 +36,11 @@ double roundMoney(double value) {
   if (value.isNaN || value.isInfinite || value <= 0) {
     return 0;
   }
+  // Past this, adding one more coin can overflow to infinity and wipe
+  // the wallet. The tower stops getting richer instead of resetting to 0.
+  if (value >= 1e300) {
+    return 1e300;
+  }
   if (value >= 1000) {
     return value;
   }

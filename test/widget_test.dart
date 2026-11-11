@@ -206,7 +206,8 @@ void main() {
     expect(floorKind(3), FloorKind.slowBurst);
     expect(floorKind(4), FloorKind.compliance);
     expect(floorBuildCost(0), 0);
-    expect(floorBuildCost(3), greaterThan(floorBuildCost(2) * 1.7));
+    expect(floorBuildCost(3), greaterThan(floorBuildCost(2) * 1.35));
+    expect(floorBuildCost(16), greaterThan(floorBuildCost(15) * 4));
     expect(floorBuildSeconds(8), greaterThan(floorBuildSeconds(2)));
     expect(floorBaseGold(9), greaterThan(floorBaseGold(6)));
   });
@@ -475,7 +476,7 @@ void main() {
     expect(deskUpgradeCost(5000), greaterThan(deskUpgradeCost(10)));
     expect(floorBuildCost(400).isFinite, isTrue);
     expect(floorBuildCost(400), greaterThan(0));
-    expect(floorBuildSeconds(400), 2000000000);
+    expect(floorBuildSeconds(400), 180);
     expect(
       offlineEarnings(
         goldPerSecond: double.nan,
@@ -494,6 +495,8 @@ void main() {
     expect(rarityForRoll(double.nan), ManagerRarity.common);
     expect(roundMoney(-12), 0);
     expect(roundMoney(double.nan), 0);
+    expect(roundMoney(double.infinity), 0);
+    expect(roundMoney(1e301), 1e300);
   });
 
   test('a corrupted or negative save still opens on Floor 1', () async {

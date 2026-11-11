@@ -39,6 +39,7 @@ flutter run -d chrome
 
 ## Changelog
 
+- Balance pass. Early floors step by 1.48 so a new buy shows up about every half minute. From Floor 14 the step is 4.2, so Floor 20 and a restructuring land around an hour of active play, and the equity bonus makes the next climb faster. Construction waits cap at 3 minutes. A wallet that would overflow stays at its ceiling instead of resetting to zero. Shareholder Equity also multiplies tap gold.
 - Unlock pacing. Quests, briefcases, research, and restructuring wait for Floors 3, 5, 10, and 20. A briefcase opened too early does not spend the ticket, and the tutorial briefcase still hires Brutus.
 - Stats screen. Lifetime gold, floors built, and time played stay after a restructuring. A broken chart point is skipped, and the history cannot grow past 40 points.
 - Tap crits and combos. The crit chance is shown on the lobby, a 2 second pause resets the combo, and a huge desk cannot crit into infinity.

@@ -775,7 +775,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     final roll = _random.nextDouble();
     final crit = roll < critChance;
     lastTapWasCrit = crit;
-    var gained = goldPerTap * researchTapBonus * comboBonus;
+    var gained = goldPerTap * researchTapBonus * comboBonus * equityMultiplier;
     if (crit) {
       gained *= 10;
       critShake += 1;
