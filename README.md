@@ -34,9 +34,11 @@ flutter run -d chrome
 - Every few minutes the office can have a visitor: a golden goblin courier, a one-minute Market Boom, an office party, or a power outage you tap to fix. The note stays until you tap it. A boom simply ends when its minute is up.
 - Each restructuring unlocks something that stays: a cosmetic skin, Night Shift floors that pay 50% more, an auto-upgrade toggle, then a second skin. The dialog previews the next reward. Equity still adds 10% gold per point.
 - Taps can crit for ×10. The chance is on the lobby (5%, plus 1% per Heavier Taps level). Tapping again within 2 seconds builds a combo, up to about ×2. A crit shakes the receptionist. One tap never pays more than 1T gold.
+- The stats screen shows lifetime gold, floors built, time played, and a net-worth chart. Net worth is wallet gold plus 1,000 per Shareholder Equity point. The chart keeps the latest 40 points.
 
 ## Changelog
 
+- Stats screen. Lifetime gold, floors built, and time played stay after a restructuring. A broken chart point is skipped, and the history cannot grow past 40 points.
 - Tap crits and combos. The crit chance is shown on the lobby, a 2 second pause resets the combo, and a huge desk cannot crit into infinity.
 - Restructuring rewards. The first reset unlocks a skin, the second unlocks Night Shift floors, the third unlocks auto-upgrade, and the fourth unlocks another skin. A locked skin in a save is ignored, and the count cannot go below zero or above 100.
 - Office events. A courier and a party pay a capped pouch, a boom doubles gold for 60 seconds, and a power outage pauses income until you tap it. An unknown saved event name is ignored, and a broken save clears the labs too.

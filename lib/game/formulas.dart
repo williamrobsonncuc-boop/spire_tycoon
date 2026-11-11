@@ -178,3 +178,24 @@ String formatAway(Duration away) {
   }
   return '${counted.inSeconds} sec';
 }
+
+/// How long the game has been open. Not the same as time away.
+String formatPlayTime(int seconds) {
+  var left = seconds;
+  if (left < 0) {
+    left = 0;
+  }
+  if (left > 1000000000) {
+    left = 1000000000;
+  }
+  final hours = left ~/ 3600;
+  final minutes = (left % 3600) ~/ 60;
+  final secs = left % 60;
+  if (hours > 0) {
+    return '${hours}h ${minutes}m';
+  }
+  if (minutes > 0) {
+    return '${minutes}m ${secs}s';
+  }
+  return '${secs}s';
+}

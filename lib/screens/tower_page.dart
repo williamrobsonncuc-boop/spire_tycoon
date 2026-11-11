@@ -14,6 +14,7 @@ import 'market_page.dart';
 import 'quests_page.dart';
 import 'research_page.dart';
 import 'shop_page.dart';
+import 'stats_page.dart';
 import 'weekend_page.dart';
 
 /// The whole spire. The list is lazy: Flutter only builds cards you can see,
@@ -307,6 +308,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-stats'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => StatsPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Stats'),
               ),
               TextButton(
                 key: const Key('open-research'),

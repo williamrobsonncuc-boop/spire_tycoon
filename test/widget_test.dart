@@ -1091,6 +1091,95 @@ void main() {
     expect(find.textContaining('Brass After Hours'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  test('stats keep lifetime numbers and a short net-worth chart', () async {
+    expect(formatPlayTime(3), '3s');
+    expect(formatPlayTime(90), '1m 30s');
+    expect(formatPlayTime(3700), '1h 1m');
+    expect(formatPlayTime(-5), '0s');
+
+    final game = GameModel(enableIdleTicks: false, netWorthEvery: 1);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true);
+    expect(game.floorsBuilt, 1);
+    game.gold = 50;
+    game.equity = 2;
+    expect(game.netWorth, 2050);
+    game.gold = double.nan;
+    expect(game.netWorth, 0);
+    game.gold = 0;
+
+    for (var i = 0; i < 45; i++) {
+      game.advanceOneSecond();
+    }
+    expect(game.playSeconds, 45);
+    expect(game.netWorthHistory.length, 40);
+
+    game.equity = 0;
+    game.floors[1] = FloorProgress(running: true);
+    game.restructure();
+    expect(game.floorsBuilt, 1);
+    expect(game.playSeconds, 45);
+    expect(game.netWorthHistory.length, 40);
+    expect(game.equity, 1);
+    expect(game.netWorth, 1000);
+
+    SharedPreferences.setMockInitialValues({
+      saveKey: jsonEncode({
+        'version': 2,
+        'gold': 4,
+        'floorsBuilt': -3,
+        'playSeconds': -8,
+        'netWorth': [10, 'nope', -4],
+        'floors': [
+          [0, 0, 1, 0],
+          [1, 0, 1, 0],
+        ],
+      }),
+    });
+    final loaded = GameModel(enableIdleTicks: false);
+    addTearDown(loaded.dispose);
+    await loaded.load();
+    expect(loaded.floorsBuilt, 0);
+    expect(loaded.playSeconds, 0);
+    expect(loaded.netWorthHistory, [10]);
+    expect(loaded.gold, 4);
+
+    SharedPreferences.setMockInitialValues({
+      saveKey: jsonEncode({
+        'version': 2,
+        'floors': [
+          [0, 0, 1, 0],
+          [1, 0, 1, 0],
+        ],
+      }),
+    });
+    final older = GameModel(enableIdleTicks: false);
+    addTearDown(older.dispose);
+    await older.load();
+    expect(older.floorsBuilt, 2);
+  });
+
+  testWidgets('the stats screen fits a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
+    await tester.tap(find.byKey(const Key('open-stats')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('stat-net-worth')), findsOneWidget);
+    expect(find.byKey(const Key('stat-lifetime')), findsOneWidget);
+    expect(find.byKey(const Key('stat-floors')), findsOneWidget);
+    expect(find.byKey(const Key('stat-play-time')), findsOneWidget);
+    expect(find.byKey(const Key('net-worth-chart')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _QueueRandom implements Random {

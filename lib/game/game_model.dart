@@ -80,10 +80,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     this.crisisChance = 0.02,
     this.eventGap = 180,
     this.critChanceOverride,
+    this.netWorthEvery = 15,
     Random? random,
   }) : _now = now ?? DateTime.now,
        _random = random ?? Random(),
-       _eventWait = eventGap;
+       _eventWait = eventGap,
+       _netWorthWait = netWorthEvery;
 
   final DateTime Function() _now;
   final bool enableIdleTicks;
@@ -99,6 +101,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Tests pin the crit roll. Null uses 5% plus research.
   final double? critChanceOverride;
+
+  /// Seconds of play between net-worth points. 0 turns the chart off.
+  final int netWorthEvery;
+  int _netWorthWait;
   int _eventWait;
   final Random _random;
 
@@ -316,6 +322,27 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int _lastTapMs = 0;
   bool lastTapWasCrit = false;
   int critShake = 0;
+
+  /// Floors the player has opened. The lobby counts as one. Restructuring keeps it.
+  int floorsBuilt = 1;
+
+  /// Seconds the game was open. Time away is not added.
+  int playSeconds = 0;
+
+  /// Up to 40 net-worth points, one every [netWorthEvery] seconds of play.
+  final List<double> netWorthHistory = [];
+
+  /// Gold, plus 1,000 for each Shareholder Equity point.
+  double get netWorth {
+    final total = gold + equity * 1000;
+    if (total.isNaN || total.isInfinite || total < 0) {
+      return 0;
+    }
+    if (total > 1e300) {
+      return 1e300;
+    }
+    return total;
+  }
 
   double get comboBonus {
     final steps = combo < 1 ? 1 : (combo > 20 ? 20 : combo);
@@ -901,6 +928,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       restructures = 100;
     }
     gold = 0;
+    _recordNetWorth();
     compliance = 0;
     policyLevel = 0;
     goldTickets = 0;
@@ -946,6 +974,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _rollClogs();
     _rollSleepingOrcs();
     _rollOfficeEvent();
+    _tickPlayTime(1);
+    _sampleNetWorth();
     _autoUpgrade();
     _checkAchievements();
     _lastActive = now;
@@ -1101,6 +1131,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     _noteDistrict(index, announce: true);
     discoveredCreatures.add(creatureOnFloor(index));
+    if (floorsBuilt < 1000000000) {
+      floorsBuilt += 1;
+    }
   }
 
   void _syncQuests(DateTime now) {
@@ -1191,6 +1224,42 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (_random.nextDouble() < crisisChance) {
         progress.sleeping = true;
       }
+    }
+  }
+
+  void _tickPlayTime(int seconds) {
+    if (seconds <= 0 || playSeconds >= 1000000000) {
+      return;
+    }
+    playSeconds += seconds;
+    if (playSeconds > 1000000000) {
+      playSeconds = 1000000000;
+    }
+  }
+
+  void _sampleNetWorth() {
+    if (netWorthEvery <= 0) {
+      return;
+    }
+    _netWorthWait -= 1;
+    if (_netWorthWait > 0) {
+      return;
+    }
+    _netWorthWait = netWorthEvery;
+    _recordNetWorth();
+  }
+
+  void _recordNetWorth() {
+    var worth = netWorth;
+    if (worth.isNaN || worth.isInfinite || worth < 0) {
+      worth = 0;
+    }
+    if (worth > 1e300) {
+      worth = 1e300;
+    }
+    netWorthHistory.add(worth);
+    while (netWorthHistory.length > 40) {
+      netWorthHistory.removeAt(0);
     }
   }
 
@@ -1352,6 +1421,49 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       }
       if (storedTutorial == null && floors.length > 1) {
         tutorialStep = 4;
+      }
+      final built = map['floorsBuilt'];
+      if (built is num) {
+        floorsBuilt = built.toInt();
+        if (floorsBuilt < 0) {
+          floorsBuilt = 0;
+        }
+        if (floorsBuilt > 1000000000) {
+          floorsBuilt = 1000000000;
+        }
+      } else {
+        floorsBuilt = floors.values.where((floor) => floor.running).length;
+        if (floorsBuilt < 1) {
+          floorsBuilt = 1;
+        }
+      }
+      final played = map['playSeconds'];
+      playSeconds = played is num ? played.toInt() : 0;
+      if (playSeconds < 0) {
+        playSeconds = 0;
+      }
+      if (playSeconds > 1000000000) {
+        playSeconds = 1000000000;
+      }
+      netWorthHistory.clear();
+      final rawWorth = map['netWorth'];
+      if (rawWorth is List) {
+        for (final item in rawWorth) {
+          if (item is! num) {
+            continue;
+          }
+          var worth = item.toDouble();
+          if (worth.isNaN || worth.isInfinite || worth < 0) {
+            continue;
+          }
+          if (worth > 1e300) {
+            worth = 1e300;
+          }
+          netWorthHistory.add(worth);
+        }
+        while (netWorthHistory.length > 40) {
+          netWorthHistory.removeAt(0);
+        }
       }
       highestDistrict = (map['highestDistrict'] as num?)?.toInt() ?? 0;
       if (highestDistrict < 0) {
@@ -1536,6 +1648,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       restructures = 0;
       selectedSkin = 'standard';
       autoUpgrade = false;
+      floorsBuilt = 1;
+      playSeconds = 0;
+      netWorthHistory.clear();
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -1603,6 +1718,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'weeklyRecruitClaimed': weeklyRecruitClaimed,
       'research': researchLevels,
       'restructures': restructures,
+      'floorsBuilt': floorsBuilt,
+      'playSeconds': playSeconds,
+      'netWorth': netWorthHistory,
       'skin': selectedSkin,
       'autoUpgrade': autoUpgrade ? 1 : 0,
       'event': officeEvent?.name ?? '',
@@ -1703,6 +1821,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (away < offlineMinimum) {
         _finishConstruction(now);
         _produce(away);
+        _tickPlayTime(away.inSeconds);
         _lastActive = now;
         notifyListeners();
         unawaited(persist());
