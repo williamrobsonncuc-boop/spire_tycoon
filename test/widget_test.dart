@@ -283,6 +283,34 @@ void main() {
     },
   );
 
+  test('restructuring resets the tower and keeps equity', () {
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true, level: 4);
+    game.floors[1] = FloorProgress(running: true);
+    game.floors[12] = FloorProgress(running: true);
+    game.gold = 5000;
+    game.goldTickets = 3;
+    game.testDiamonds = 4;
+    game.managers[ManagerId.gary] = 2;
+    game.policyLevel = 2;
+
+    expect(game.restructuringEquity, 12);
+    game.restructure();
+
+    expect(game.equity, 12);
+    expect(game.gold, 0);
+    expect(game.goldTickets, 0);
+    expect(game.testDiamonds, 4);
+    expect(game.copies(ManagerId.gary), 0);
+    expect(game.lobbyLevel, 0);
+    expect(game.isRunning(0), isTrue);
+    expect(game.isRunning(12), isFalse);
+    expect(game.isRunning(1), isFalse);
+    // 12 equity points is +120% gold, so the lobby's 0.2/sec becomes 0.44.
+    expect(game.goldPerSecond, closeTo(0.44, 0.001));
+  });
+
   test('briefcase odds match the posted 75 / 18 / 6 / 1 split', () {
     expect(rarityForRoll(0), ManagerRarity.common);
     expect(rarityForRoll(0.749), ManagerRarity.common);

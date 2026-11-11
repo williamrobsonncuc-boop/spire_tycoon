@@ -132,6 +132,21 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// Each Shareholder Equity point is another +10% gold.
   double get equityMultiplier => 1 + equity * 0.10;
 
+  /// Highest floor index that is open. The lobby is 0.
+  int get highestRunningFloor {
+    var highest = 0;
+    for (final entry in floors.entries) {
+      if (entry.value.running && entry.key > highest) {
+        highest = entry.key;
+      }
+    }
+    return highest;
+  }
+
+  /// Equity you would earn by restructuring. The lobby alone is not enough.
+  int get restructuringEquity =>
+      highestRunningFloor < 1 ? 0 : highestRunningFloor;
+
   int copies(ManagerId id) => managers[id] ?? 0;
 
   /// Gary's +2% speed per copy.
@@ -382,6 +397,32 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     final halved = (left / 2).ceil();
     progress.constructionEndsMs = _now().millisecondsSinceEpoch + halved * 1000;
+    _touch();
+  }
+
+  /// Wipes the run and keeps Shareholder Equity, which multiplies gold forever.
+  ///
+  /// TEST diamonds stay, because they are a practice currency, not progress.
+  /// The endless tower comes back from the same recipes, starting at the lobby.
+  void restructure() {
+    final gain = restructuringEquity;
+    if (gain <= 0) {
+      return;
+    }
+    equity += gain;
+    gold = 0;
+    compliance = 0;
+    policyLevel = 0;
+    goldTickets = 0;
+    managers.clear();
+    lastHire = null;
+    pendingOfflineGold = 0;
+    pendingCompliance = 0;
+    pendingOfflineSeconds = 0;
+    _slowCharge = 0;
+    floors
+      ..clear()
+      ..[0] = FloorProgress(running: true);
     _touch();
   }
 
