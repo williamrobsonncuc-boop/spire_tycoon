@@ -160,6 +160,15 @@ class _TowerHeader extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              IconButton(
+                key: const Key('mute-toggle'),
+                tooltip: game.muted ? 'Unmute' : 'Mute',
+                onPressed: game.toggleMute,
+                icon: Icon(
+                  game.muted ? Icons.volume_off : Icons.volume_up,
+                  color: cream,
+                ),
+              ),
               TextButton(
                 key: const Key('open-restructure'),
                 onPressed: () {

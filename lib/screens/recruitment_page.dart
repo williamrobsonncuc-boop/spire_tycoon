@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../game/game_model.dart';
 import '../game/managers.dart';
+import '../game/sound_board.dart';
 import '../theme/app_colors.dart';
 
 /// Briefcase gacha. The odds stay on screen. Nothing here costs real money.
@@ -82,7 +83,12 @@ class RecruitmentPage extends StatelessWidget {
                   child: InkWell(
                     key: const Key('open-briefcase'),
                     borderRadius: BorderRadius.circular(cornerRadius),
-                    onTap: canOpen ? () => game.openBriefcase() : null,
+                    onTap: canOpen
+                        ? () {
+                            OfficeSounds.play(context, SoundEffect.latch);
+                            game.openBriefcase();
+                          }
+                        : null,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Text(

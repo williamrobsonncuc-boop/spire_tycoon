@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../game/floor_catalog.dart';
 import '../game/formulas.dart';
 import '../game/game_model.dart';
+import '../game/sound_board.dart';
 import '../theme/app_colors.dart';
 import 'sponsor_memo.dart';
 
@@ -166,6 +167,7 @@ class _LobbyTapState extends State<_LobbyTap>
   }
 
   void _tap() {
+    OfficeSounds.play(context, SoundEffect.coin);
     final gained = widget.game.goldPerTap;
     widget.game.tapLobby();
     setState(() {
@@ -272,7 +274,12 @@ class _BuildButton extends StatelessWidget {
       child: InkWell(
         key: Key('build-floor-$index'),
         borderRadius: BorderRadius.circular(cornerRadius),
-        onTap: affordable ? () => game.startBuild(index) : null,
+        onTap: affordable
+            ? () {
+                OfficeSounds.play(context, SoundEffect.ding);
+                game.startBuild(index);
+              }
+            : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Column(
@@ -362,22 +369,24 @@ class _SleepBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: crimson,
-      borderRadius: BorderRadius.circular(cornerRadius),
-      child: InkWell(
-        key: const Key('wake-orc'),
+    return _Buzz(
+      child: Material(
+        color: crimson,
         borderRadius: BorderRadius.circular(cornerRadius),
-        onTap: onWake,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Text(
-            '! Sleeping orc. Tap to wake the crew.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: cream,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
+        child: InkWell(
+          key: const Key('wake-orc'),
+          borderRadius: BorderRadius.circular(cornerRadius),
+          onTap: onWake,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Text(
+              '! Sleeping orc. Tap to wake the crew.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: cream,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ),
@@ -393,28 +402,54 @@ class _ClogBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: crimson,
-      borderRadius: BorderRadius.circular(cornerRadius),
-      child: InkWell(
-        key: const Key('clear-clog'),
+    return _Buzz(
+      child: Material(
+        color: crimson,
         borderRadius: BorderRadius.circular(cornerRadius),
-        onTap: onClear,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Text(
-            'Clogged pipe. Tap to clear it.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: cream,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
+        child: InkWell(
+          key: const Key('clear-clog'),
+          borderRadius: BorderRadius.circular(cornerRadius),
+          onTap: onClear,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Text(
+              'Clogged pipe. Tap to clear it.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: cream,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _Buzz extends StatefulWidget {
+  const _Buzz({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Buzz> createState() => _BuzzState();
+}
+
+class _BuzzState extends State<_Buzz> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        OfficeSounds.play(context, SoundEffect.buzz);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _UpgradeButton extends StatelessWidget {
@@ -443,7 +478,12 @@ class _UpgradeButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(cornerRadius),
       child: InkWell(
         borderRadius: BorderRadius.circular(cornerRadius),
-        onTap: affordable ? () => game.upgradeFloor(index) : null,
+        onTap: affordable
+            ? () {
+                OfficeSounds.play(context, SoundEffect.ding);
+                game.upgradeFloor(index);
+              }
+            : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
