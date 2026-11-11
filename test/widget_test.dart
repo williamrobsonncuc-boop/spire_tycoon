@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
 import 'package:spire_tycoon/game/game_model.dart';
+import 'package:spire_tycoon/game/managers.dart';
 import 'package:spire_tycoon/main.dart';
 
 void main() {
@@ -65,6 +66,7 @@ void main() {
   testWidgets('tapping the goblin earns gold and Upgrade Desk raises it', (
     WidgetTester tester,
   ) async {
+    _useTallWindow(tester);
     final game = GameModel(enableIdleTicks: false);
     addTearDown(game.dispose);
     await tester.pumpWidget(SpireTycoonApp(game: game));
@@ -76,9 +78,13 @@ void main() {
     expect(find.text('+0.2 per second'), findsOneWidget);
 
     expect(_upgradeColor(tester), const Color(0xFF334155));
-    await tester.tap(find.byKey(const Key('upgrade-desk')));
-    await tester.pump();
-    expect(find.text('+1 per tap'), findsOneWidget);
+    final disabledTap = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const Key('upgrade-desk')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(disabledTap.onTap, isNull);
     expect(find.text('Level 0'), findsOneWidget);
 
     for (var tap = 0; tap < 10; tap++) {
@@ -90,6 +96,7 @@ void main() {
     expect(find.text('+1'), findsWidgets);
     expect(_upgradeColor(tester), const Color(0xFF10B981));
 
+    await tester.ensureVisible(find.byKey(const Key('upgrade-desk')));
     await tester.tap(find.byKey(const Key('upgrade-desk')));
     await tester.pump();
 
@@ -242,6 +249,78 @@ void main() {
     expect(find.textContaining('Legal Dept II'), findsNothing);
     expect(find.textContaining('Floor 30'), findsNothing);
   });
+
+  test('briefcase odds match the posted 75 / 18 / 6 / 1 split', () {
+    expect(rarityForRoll(0), ManagerRarity.common);
+    expect(rarityForRoll(0.749), ManagerRarity.common);
+    expect(rarityForRoll(0.75), ManagerRarity.rare);
+    expect(rarityForRoll(0.929), ManagerRarity.rare);
+    expect(rarityForRoll(0.93), ManagerRarity.epic);
+    expect(rarityForRoll(0.989), ManagerRarity.epic);
+    expect(rarityForRoll(0.99), ManagerRarity.legendary);
+    expect(managerForRoll(0.2), ManagerId.gary);
+    expect(managerForRoll(0.8), ManagerId.karen);
+    expect(managerForRoll(0.95), ManagerId.brutus);
+    expect(managerForRoll(0.992), ManagerId.vlad);
+    expect(managerForRoll(0.997), ManagerId.lich);
+  });
+
+  test('a briefcase hires staff and Vlad multiplies offline gold', () async {
+    final clock = DateTime.utc(2026, 3, 1, 8);
+    final past = clock.subtract(const Duration(minutes: 2));
+    SharedPreferences.setMockInitialValues({
+      saveKey: jsonEncode({
+        'version': 3,
+        'gold': 0,
+        'deskLevel': 0,
+        'pendingOfflineGold': 0,
+        'pendingOfflineSeconds': 0,
+        'lastActiveMs': past.millisecondsSinceEpoch,
+        'tickets': 1,
+        'managers': {'vlad': 1},
+      }),
+    });
+    final game = GameModel(enableIdleTicks: false, now: () => clock);
+    addTearDown(game.dispose);
+    await game.load();
+
+    // 120s * 0.2 gold/sec * 4 from one Vlad.
+    expect(game.pendingOfflineGold, 96);
+    expect(game.copies(ManagerId.vlad), 1);
+    game.openBriefcase(roll: 0.1);
+    expect(game.lastHire, ManagerId.gary);
+    expect(game.copies(ManagerId.gary), 1);
+    expect(game.goldTickets, 0);
+    expect(game.constructionSeconds(1), floorBuildSeconds(1));
+    game.managers[ManagerId.lich] = 1;
+    expect(game.constructionSeconds(1), (floorBuildSeconds(1) * 0.5).round());
+  });
+
+  testWidgets('the recruitment screen shows the odds', (tester) async {
+    _useTallWindow(tester);
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('open-recruitment')));
+    await tester.tap(find.byKey(const Key('open-recruitment')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('odds-table')), findsOneWidget);
+    expect(find.textContaining('Common 75%'), findsOneWidget);
+    expect(find.textContaining('Rare 18%'), findsOneWidget);
+    expect(find.textContaining('Epic 6%'), findsOneWidget);
+    expect(find.textContaining('Legendary 1%'), findsOneWidget);
+    expect(find.text('Need 1 Gold Ticket'), findsOneWidget);
+  });
+}
+
+void _useTallWindow(WidgetTester tester) {
+  tester.view.physicalSize = const Size(900, 1600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }
 
 Future<void> _pumpUntilReady(WidgetTester tester) async {
