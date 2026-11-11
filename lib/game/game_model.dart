@@ -553,6 +553,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// What the player actually pays to open a floor, after research.
+  double buildPrice(int index) {
+    final discounted = floorBuildCost(index) * (1 - researchBuildDiscount);
+    return roundMoney(discounted);
+  }
+
   bool canBuild(int index) {
     if (bossFloor != null ||
         index <= 0 ||
@@ -563,7 +569,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (!isRunning(index - 1)) {
       return false;
     }
-    return gold + 0.001 >= floorBuildCost(index);
+    return gold + 0.001 >= buildPrice(index);
   }
 
   bool canUpgrade(int index) {
@@ -805,9 +811,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (!isRunning(index - 1)) {
       return;
     }
-    final cost = roundMoney(
-      floorBuildCost(index) * (1 - researchBuildDiscount),
-    );
+    final cost = buildPrice(index);
     if (gold + 0.001 < cost) {
       return;
     }

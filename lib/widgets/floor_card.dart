@@ -337,7 +337,7 @@ class _BuildButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cost = floorBuildCost(index);
+    final cost = game.buildPrice(index);
     final affordable = game.canBuild(index);
     final background = affordable ? emerald : slate;
     final textColor = affordable ? cream : cream.withValues(alpha: 0.55);

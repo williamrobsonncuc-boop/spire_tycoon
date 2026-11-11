@@ -198,6 +198,26 @@ void main() {
     expect(formatNumber(3.4e18), '3.4ab');
   });
 
+  test('a research discount is the price the build button uses', () {
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true);
+    game.floors[9] = FloorProgress(running: true);
+    game.researchLevels[2] = 10;
+    final full = floorBuildCost(10);
+    final price = game.buildPrice(10);
+    expect(price, lessThan(full));
+    expect(price, greaterThan(0));
+    game.gold = price - 1;
+    expect(game.canBuild(10), isFalse);
+    game.gold = full - 1;
+    expect(game.canBuild(10), isTrue);
+    game.startBuild(10);
+    expect(game.isBuilding(10), isTrue);
+    expect(game.gold, greaterThanOrEqualTo(0));
+    expect(game.gold.isFinite, isTrue);
+  });
+
   test('the first five floors are designed and the rest are generated', () {
     expect(floorRecipe(5).name, 'Marketing (Imps)');
     expect(floorRecipe(11).title, 'Floor 12: Legal Dept II (Compliance Imps)');

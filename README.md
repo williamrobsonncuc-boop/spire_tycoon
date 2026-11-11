@@ -4,12 +4,14 @@ Spire Tycoon is a beginner's idle game. You run a haunted office tower. The inte
 
 ## How to run
 
-From this folder:
-
 ```bash
+git clone https://github.com/williamrobsonncuc-boop/spire_tycoon.git
+cd spire_tycoon
 flutter pub get
 flutter run -d chrome
 ```
+
+No account, no real payment, and no ad SDK. The practice shop and the sponsor memo are labels inside the game.
 
 ## Features
 
@@ -39,6 +41,7 @@ flutter run -d chrome
 
 ## Changelog
 
+- Bug hunt. The build button was still pricing floors at the full cost after Cheaper Builds research, so a tower that could afford the discount looked locked. The button, the price on the card, and the gold taken now use the same number. A wallet that would overflow still stops at its ceiling instead of becoming zero.
 - Visual polish. The wallet pulses when gold changes, buttons show a press highlight, and the column stays readable from a 360px phone to a desktop window. Empty trophies, an empty codex, and a market day with no campaign yet say so in words.
 - Balance pass. Early floors step by 1.48 so a new buy shows up about every half minute. From Floor 14 the step is 4.2, so Floor 20 and a restructuring land around an hour of active play, and the equity bonus makes the next climb faster. Construction waits cap at 3 minutes. A wallet that would overflow stays at its ceiling instead of resetting to zero. Shareholder Equity also multiplies tap gold.
 - Unlock pacing. Quests, briefcases, research, and restructuring wait for Floors 3, 5, 10, and 20. A briefcase opened too early does not spend the ticket, and the tutorial briefcase still hires Brutus.
