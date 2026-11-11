@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'game/game_model.dart';
-import 'screens/lobby_page.dart';
+import 'screens/tower_page.dart';
 import 'theme/app_colors.dart';
 
 void main() {
@@ -44,7 +44,7 @@ class _SpireTycoonAppState extends State<SpireTycoonApp> {
       title: 'Spire Tycoon',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: LobbyPage(game: _game),
+      home: TowerPage(game: _game),
     );
   }
 }
