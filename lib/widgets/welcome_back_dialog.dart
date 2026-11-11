@@ -38,7 +38,7 @@ class WelcomeBackDialog extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'The Executive Lobby kept working for $away.',
+              'The spire kept working for $away.',
               style: const TextStyle(color: cream, fontSize: 16, height: 1.35),
             ),
             const SizedBox(height: 12),
@@ -55,6 +55,13 @@ class WelcomeBackDialog extends StatelessWidget {
               'gold waiting',
               style: TextStyle(color: cream, fontSize: 16),
             ),
+            if (game.pendingCompliance > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${formatGold(game.pendingCompliance)} compliance waiting',
+                style: const TextStyle(color: cyan, fontSize: 16),
+              ),
+            ],
             const SizedBox(height: 8),
             const Text(
               'Offline pay stops after 8 hours.',

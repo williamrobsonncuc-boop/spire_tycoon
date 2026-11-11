@@ -14,4 +14,5 @@ flutter run -d chrome
 ## Features
 
 - Floor 1, The Executive Lobby: tap the goblin receptionist for gold. Upgrade Desk costs 10 × 1.10^level gold and adds 1 gold per tap.
-- The lobby also earns gold every second. The game saves in the browser. When you come back, a welcome note pays what you missed, up to 8 hours. A 3 second practice "sponsor memo" doubles that payout. It is not a real ad.
+- The spire earns gold every second. The game saves in the browser. When you come back, a welcome note pays what you missed, up to 8 hours. A 3 second practice "sponsor memo" doubles that payout. It is not a real ad.
+- The tower is endless. Floors 1–5 are hand-built departments (lobby, Dragon Forge, alchemy, necromancy, HR & Legal). Later floors are generated, for example Floor 6: Marketing (Imps) and Floor 12: Legal Dept II. Build costs, timers, and income grow exponentially. Big numbers show as 1.2K, 3.4M, 5.6B, 7.8T, then aa, ab, and so on. The list only builds the floors on screen, and the save only stores floors you have started.

@@ -3,13 +3,56 @@ import 'dart:math';
 /// Rounds to the nearest tenth so prices and payouts match what we display.
 double roundTenths(double value) => (value * 10).round() / 10;
 
-/// "12" or "12.1". Bigger numbers get K/M/B suffixes in a later feature.
-String formatGold(double value) {
+/// Small amounts stay exact: "12" or "12.1".
+///
+/// From 1,000 upward the game uses short suffixes: 1.2K, 3.4M, 5.6B, 7.8T,
+/// then aa, ab, ac... so an endless tower can show huge costs.
+String formatNumber(double value) {
+  if (value.isNaN || value.isInfinite) {
+    return '0';
+  }
+  final sign = value < 0 ? '-' : '';
+  var magnitude = value.abs();
+  if (magnitude < 1000) {
+    return sign + _formatSmall(magnitude);
+  }
+
+  var tier = 0;
+  while (magnitude >= 1000 && tier < 400) {
+    magnitude /= 1000;
+    tier += 1;
+  }
+
+  var shown = (magnitude * 10).round() / 10;
+  // 999.95K rounds to 1000.0K, which should read as 1.0M.
+  if (shown >= 1000) {
+    shown = 1;
+    tier += 1;
+  }
+  return '$sign${shown.toStringAsFixed(1)}${_suffixForTier(tier)}';
+}
+
+String _formatSmall(double value) {
   final rounded = roundTenths(value);
   if (rounded == rounded.roundToDouble()) {
     return rounded.toInt().toString();
   }
   return rounded.toStringAsFixed(1);
+}
+
+/// Kept so older call sites stay easy to read. Same rules as [formatNumber].
+String formatGold(double value) => formatNumber(value);
+
+String _suffixForTier(int tier) {
+  const named = ['', 'K', 'M', 'B', 'T'];
+  if (tier < named.length) {
+    return named[tier];
+  }
+  // tier 5 is the first "aa" group (1,000^5 = 1 quadrillion).
+  final index = tier - named.length;
+  final first = String.fromCharCode(97 + (index ~/ 26) % 26);
+  final second = String.fromCharCode(97 + (index % 26));
+  return '$first$second';
 }
 
 /// Price of the next Upgrade Desk purchase.

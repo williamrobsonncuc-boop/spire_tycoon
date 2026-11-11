@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
 import 'package:spire_tycoon/game/game_model.dart';
 import 'package:spire_tycoon/main.dart';
@@ -55,7 +56,7 @@ void main() {
     await game.load();
 
     expect(game.gold, 50);
-    expect(game.deskLevel, 0);
+    expect(game.lobbyLevel, 0);
     // 120 seconds * 0.2 gold per second.
     expect(game.pendingOfflineGold, 24);
     expect(game.goldPerTap, 1);
@@ -69,7 +70,7 @@ void main() {
     await tester.pumpWidget(SpireTycoonApp(game: game));
     await _pumpUntilReady(tester);
 
-    expect(find.text('The Executive Lobby'), findsOneWidget);
+    expect(find.text('Floor 1: The Executive Lobby'), findsOneWidget);
     expect(find.text('0'), findsOneWidget);
     expect(find.text('+1 per tap'), findsOneWidget);
     expect(find.text('+0.2 per second'), findsOneWidget);
@@ -166,6 +167,80 @@ void main() {
     expect(find.text('PRACTICE AD'), findsNothing);
     // 10 gold already in the wallet, plus 24 * 2 from the memo.
     expect(find.text('58'), findsOneWidget);
+  });
+
+  test('big numbers use K M B T then aa', () {
+    expect(formatNumber(12.1), '12.1');
+    expect(formatNumber(1200), '1.2K');
+    expect(formatNumber(3.4e6), '3.4M');
+    expect(formatNumber(5.6e9), '5.6B');
+    expect(formatNumber(7.8e12), '7.8T');
+    expect(formatNumber(1.2e15), '1.2aa');
+    expect(formatNumber(3.4e18), '3.4ab');
+  });
+
+  test('the first five floors are designed and the rest are generated', () {
+    expect(floorRecipe(5).name, 'Marketing (Imps)');
+    expect(floorRecipe(11).title, 'Floor 12: Legal Dept II (Minotaurs)');
+    expect(floorKind(2), FloorKind.clog);
+    expect(floorKind(3), FloorKind.slowBurst);
+    expect(floorKind(4), FloorKind.compliance);
+    expect(floorBuildCost(0), 0);
+    expect(floorBuildCost(3), greaterThan(floorBuildCost(2) * 1.7));
+    expect(floorBuildSeconds(8), greaterThan(floorBuildSeconds(2)));
+    expect(floorBaseGold(9), greaterThan(floorBaseGold(6)));
+  });
+
+  test(
+    'only touched floors are saved, and construction finishes on time',
+    () async {
+      final clock = DateTime.utc(2026, 6, 1, 9);
+      var now = clock;
+      SharedPreferences.setMockInitialValues({});
+      final game = GameModel(enableIdleTicks: false, now: () => now);
+      addTearDown(game.dispose);
+      await game.load();
+
+      game.gold = 100000;
+      game.startBuild(1);
+      await game.persist();
+
+      final prefs = await SharedPreferences.getInstance();
+      final saved =
+          jsonDecode(prefs.getString(saveKey)!) as Map<String, dynamic>;
+      final storedFloors = saved['floors'] as List;
+      expect(storedFloors.length, 2);
+      expect(game.isBuilding(1), isTrue);
+
+      now = now.add(Duration(seconds: floorBuildSeconds(1)));
+      game.advanceOneSecond();
+      expect(game.isRunning(1), isTrue);
+
+      final cloggy = GameModel(
+        enableIdleTicks: false,
+        clogChance: 1,
+        now: () => now,
+      );
+      addTearDown(cloggy.dispose);
+      cloggy.floors[2] = FloorProgress(running: true);
+      cloggy.advanceOneSecond();
+      expect(cloggy.floors[2]!.clogged, isTrue);
+      cloggy.clearClog(2);
+      expect(cloggy.floors[2]!.clogged, isFalse);
+    },
+  );
+
+  testWidgets('far floors are not built until they scroll into view', (
+    WidgetTester tester,
+  ) async {
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+
+    expect(find.text('Floor 1: The Executive Lobby'), findsOneWidget);
+    expect(find.textContaining('Legal Dept II'), findsNothing);
+    expect(find.textContaining('Floor 30'), findsNothing);
   });
 }
 
