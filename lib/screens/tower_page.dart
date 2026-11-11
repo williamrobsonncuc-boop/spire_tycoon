@@ -90,7 +90,7 @@ class _TowerPageState extends State<TowerPage> {
 
         return Scaffold(
           key: const Key('game-ready'),
-          backgroundColor: navy,
+          backgroundColor: Color(game.districtTint),
           body: Stack(
             children: [
               SafeArea(
@@ -102,6 +102,31 @@ class _TowerPageState extends State<TowerPage> {
                       child: Column(
                         children: [
                           _TowerHeader(game: game),
+                          if (game.districtNotice != null) ...[
+                            const SizedBox(height: 8),
+                            Material(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(cornerRadius),
+                              child: InkWell(
+                                key: const Key('district-notice'),
+                                borderRadius: BorderRadius.circular(
+                                  cornerRadius,
+                                ),
+                                onTap: game.dismissDistrictNotice,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Text(
+                                    game.districtNotice!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: cyan,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           if (game.celebration != null) ...[
                             const SizedBox(height: 8),
                             Material(

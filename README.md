@@ -26,16 +26,12 @@ flutter run -d chrome
 - Weekend subsidiary: on Saturday and Sunday you can file one report a day. The leaderboard is a local stand-in, not a live server. A daily check-in streak pays 10 gold times the streak.
 - Market domination: five automatic boardroom pitches. Your tower income is your strength. One campaign per day. A win pays gold. It is not a live match.
 - Milestones at desk levels 10, 25, 50, 100, 200, and beyond double that floor's speed. Achievements such as Synergy Achieved, Hostile Takeover, and First Billion pay Gold Tickets once.
+- Themed districts every 10 floors: Basement Dungeon, Corporate Offices, Skyscraper, Cloud Penthouse, Space Station, then Abyssal HQ. The background tint and later monsters change, and a dismissible note announces a new district once.
 
 ## Changelog
 
+- Themed districts every 10 floors, with a one-time unlock note. Floors past the last theme stay in Abyssal HQ instead of crashing.
 - Milestones and an achievements screen. Ticket rewards are granted once.
-- Market domination, a once-a-day auto campaign. A second run the same day does nothing, and a broken or huge income cannot mint an infinite prize.
-- Weekend subsidiary and daily check-in.
-- Bug hunt: huge upgrade costs and build timers no longer throw or become free; NaN, infinity, and negative balances load as zero; a broken floor in a save is skipped; a corrupted save still opens Floor 1; leaving the app for under 30 seconds still pays that gap, and longer absences stay capped at 8 hours.
-
-## Changelog
-
 - Market domination, a once-a-day auto campaign. A second run the same day does nothing, and a broken or huge income cannot mint an infinite prize.
 - Weekend subsidiary and daily check-in.
 - Bug hunt: huge upgrade costs and build timers no longer throw or become free; NaN, infinity, and negative balances load as zero; a broken floor in a save is skipped; a corrupted save still opens Floor 1; leaving the app for under 30 seconds still pays that gap, and longer absences stay capped at 8 hours.

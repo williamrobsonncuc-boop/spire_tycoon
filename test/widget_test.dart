@@ -196,7 +196,7 @@ void main() {
 
   test('the first five floors are designed and the rest are generated', () {
     expect(floorRecipe(5).name, 'Marketing (Imps)');
-    expect(floorRecipe(11).title, 'Floor 12: Legal Dept II (Minotaurs)');
+    expect(floorRecipe(11).title, 'Floor 12: Legal Dept II (Compliance Imps)');
     expect(floorKind(2), FloorKind.clog);
     expect(floorKind(3), FloorKind.slowBurst);
     expect(floorKind(4), FloorKind.compliance);
@@ -668,6 +668,33 @@ void main() {
     expect(game.goldTickets, tickets + 6);
     game.tapLobby();
     expect(game.goldTickets, tickets + 6);
+  });
+
+  test('districts change every 10 floors and announce once', () {
+    expect(districtForFloor(0).name, 'Basement Dungeon');
+    expect(districtForFloor(9).name, 'Basement Dungeon');
+    expect(districtForFloor(10).name, 'Corporate Offices');
+    expect(districtForFloor(20).name, 'Skyscraper');
+    expect(districtForFloor(50).name, 'Abyssal HQ');
+    expect(districtForFloor(500).name, 'Abyssal HQ');
+    expect(floorRecipe(5).name, 'Marketing (Imps)');
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true);
+    game.gold = 1e20;
+    game.testDiamonds = 20;
+    for (var index = 1; index <= 10; index++) {
+      game.startBuild(index);
+      game.skipBuildWithDiamond(index);
+    }
+    expect(game.isRunning(10), isTrue);
+    expect(game.districtNotice, 'New District Unlocked: Corporate Offices');
+    expect(game.districtTint, 0xFF1E3A5F);
+    game.dismissDistrictNotice();
+    expect(game.districtNotice, isNull);
+    game.skipBuildWithDiamond(10);
+    expect(game.districtNotice, isNull);
   });
 }
 

@@ -127,6 +127,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// Set when an upgrade crosses 10, 25, 50... Cleared when the player taps it.
   String? celebration;
 
+  /// Highest district the player has already been told about. 0 is the basement.
+  int highestDistrict = 0;
+  String? districtNotice;
+
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
   String? lastQuip;
@@ -281,6 +285,27 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     celebration = null;
     notifyListeners();
+  }
+
+  void dismissDistrictNotice() {
+    if (districtNotice == null) {
+      return;
+    }
+    districtNotice = null;
+    _touch();
+  }
+
+  int get districtTint => districtAt(highestDistrict).tint;
+
+  void _noteDistrict(int floorIndex, {required bool announce}) {
+    final district = districtIndexForFloor(floorIndex);
+    if (district <= highestDistrict) {
+      return;
+    }
+    highestDistrict = district;
+    if (announce && district > 0) {
+      districtNotice = 'New District Unlocked: ${districtAt(district).name}';
+    }
   }
 
   bool canBuild(int index) {
@@ -570,7 +595,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     testDiamonds -= 1;
-    _openFloor(floors[index]!, grantDiamond: false);
+    _openFloor(floors[index]!, index: index, grantDiamond: false);
     _touch();
   }
 
@@ -691,21 +716,27 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void _finishConstruction(DateTime now) {
     final nowMs = now.millisecondsSinceEpoch;
-    for (final progress in floors.values) {
+    for (final entry in floors.entries) {
+      final progress = entry.value;
       final ends = progress.constructionEndsMs;
       if (ends != null && !progress.running && ends <= nowMs) {
-        _openFloor(progress, grantDiamond: true);
+        _openFloor(progress, index: entry.key, grantDiamond: true);
       }
     }
   }
 
-  void _openFloor(FloorProgress progress, {required bool grantDiamond}) {
+  void _openFloor(
+    FloorProgress progress, {
+    required int index,
+    required bool grantDiamond,
+  }) {
     progress.running = true;
     progress.constructionEndsMs = null;
     goldTickets += 1;
     if (grantDiamond) {
       testDiamonds += 1;
     }
+    _noteDistrict(index, announce: true);
   }
 
   void _rollSleepingOrcs() {
@@ -819,6 +850,19 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (storedTutorial == null && floors.length > 1) {
         tutorialStep = 4;
       }
+      highestDistrict = (map['highestDistrict'] as num?)?.toInt() ?? 0;
+      if (highestDistrict < 0) {
+        highestDistrict = 0;
+      }
+      final storedNotice = map['districtNotice'];
+      districtNotice = storedNotice is String && storedNotice.isNotEmpty
+          ? storedNotice
+          : null;
+      for (final entry in floors.entries) {
+        if (entry.value.running) {
+          _noteDistrict(entry.key, announce: false);
+        }
+      }
       _sanitizeLoadedNumbers();
       loginStreak = (map['loginStreak'] as num?)?.toInt() ?? 0;
       lastLoginDay = map['lastLoginDay'] as String? ?? '';
@@ -877,6 +921,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       marketWins = 0;
       claimedAchievements.clear();
       celebration = null;
+      highestDistrict = 0;
+      districtNotice = null;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -942,6 +988,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'lifetimeGold': lifetimeGold,
       'marketWins': marketWins,
       'achievements': claimedAchievements.toList(),
+      'highestDistrict': highestDistrict,
+      'districtNotice': districtNotice,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,

@@ -90,18 +90,115 @@ const List<String> _departments = [
   'Facilities',
 ];
 
-const List<String> _monsters = [
-  'Imps',
-  'Goblins',
-  'Skeletons',
-  'Ghosts',
-  'Orcs',
-  'Witches',
-  'Minotaurs',
-  'Banshees',
-  'Liches',
-  'Slimes',
+/// Floors 1–10 are district 0, 11–20 are district 1, and so on.
+int districtIndexForFloor(int floorIndex) {
+  if (floorIndex < 0) {
+    return 0;
+  }
+  return floorIndex ~/ 10;
+}
+
+class DistrictTheme {
+  const DistrictTheme({
+    required this.name,
+    required this.tint,
+    required this.monsters,
+    required this.emoji,
+  });
+
+  final String name;
+
+  /// Scaffold background. Kept dark so cream text stays readable.
+  final int tint;
+  final List<String> monsters;
+  final List<String> emoji;
+}
+
+const List<DistrictTheme> districtThemes = [
+  DistrictTheme(
+    name: 'Basement Dungeon',
+    tint: 0xFF1E293B,
+    monsters: [
+      'Imps',
+      'Goblins',
+      'Skeletons',
+      'Ghosts',
+      'Orcs',
+      'Witches',
+      'Minotaurs',
+      'Banshees',
+      'Liches',
+      'Slimes',
+    ],
+    emoji: ['😈', '👺', '💀', '👻', '👹', '🧙', '🐂', '😱', '🧟', '🫧'],
+  ),
+  DistrictTheme(
+    name: 'Corporate Offices',
+    tint: 0xFF1E3A5F,
+    monsters: [
+      'Auditors',
+      'Interns',
+      'Consultants',
+      'Middle Managers',
+      'Receptionists',
+      'Accountants',
+      'Compliance Imps',
+      'Board Goblins',
+      'HR Shades',
+      'Coffee Golems',
+    ],
+    emoji: ['📎', '🧑', '💼', '🗂️', '🔔', '🧮', '😈', '👺', '👻', '☕'],
+  ),
+  DistrictTheme(
+    name: 'Skyscraper',
+    tint: 0xFF0F3A4A,
+    monsters: [
+      'Gargoyles',
+      'Window Wraiths',
+      'Elevator Orcs',
+      'Penthouse Shades',
+      'Crane Giants',
+    ],
+    emoji: ['🗽', '🪟', '🛗', '👻', '🏗️'],
+  ),
+  DistrictTheme(
+    name: 'Cloud Penthouse',
+    tint: 0xFF164E63,
+    monsters: ['Cloud Imps', 'Storm Clerks', 'Sky Liches', 'Zephyr Interns'],
+    emoji: ['☁️', '⛈️', '🧟', '💨'],
+  ),
+  DistrictTheme(
+    name: 'Space Station',
+    tint: 0xFF1E1B4B,
+    monsters: ['Void Clerks', 'Asteroid Orcs', 'Nebula Witches', 'Dock Ghosts'],
+    emoji: ['🛸', '☄️', '🧙', '👻'],
+  ),
+  DistrictTheme(
+    name: 'Abyssal HQ',
+    tint: 0xFF2A1215,
+    monsters: [
+      'Leviathans',
+      'Trench Banshees',
+      'Ink Krakens',
+      'Pearl Auditors',
+    ],
+    emoji: ['🦑', '😱', '🐙', '🦪'],
+  ),
 ];
+
+DistrictTheme districtAt(int districtIndex) {
+  if (districtIndex < 0) {
+    return districtThemes.first;
+  }
+  if (districtIndex >= districtThemes.length) {
+    return districtThemes.last;
+  }
+  return districtThemes[districtIndex];
+}
+
+DistrictTheme districtForFloor(int floorIndex) {
+  return districtAt(districtIndexForFloor(floorIndex));
+}
 
 const List<String> _products = [
   'brand hexes',
@@ -116,19 +213,6 @@ const List<String> _products = [
   'ink contracts',
 ];
 
-const List<String> _monsterEmoji = [
-  '😈',
-  '👺',
-  '💀',
-  '👻',
-  '👹',
-  '🧙',
-  '🐂',
-  '😱',
-  '🧟',
-  '🫧',
-];
-
 FloorRecipe floorRecipe(int index) {
   if (index < _designedFloors.length) {
     return _designedFloors[index];
@@ -136,14 +220,17 @@ FloorRecipe floorRecipe(int index) {
   final generated = index - _designedFloors.length;
   final department = _departments[generated % _departments.length];
   final cycle = generated ~/ _departments.length;
-  final monster = _monsters[generated % _monsters.length];
+  final district = districtForFloor(index);
+  final monster = district.monsters[generated % district.monsters.length];
+  final emoji = district.emoji[generated % district.emoji.length];
   final product = _products[generated % _products.length];
   final suffix = cycle == 0 ? '' : ' ${_roman(cycle + 1)}';
   return FloorRecipe(
     index: index,
     name: '$department$suffix ($monster)',
-    emoji: _monsterEmoji[generated % _monsterEmoji.length],
-    blurb: 'A later department bottling $product. Same jobs, bigger numbers.',
+    emoji: emoji,
+    blurb:
+        '${district.name}. A later department bottling $product. Same jobs, bigger numbers.',
     kind: FloorKind.gold,
   );
 }
