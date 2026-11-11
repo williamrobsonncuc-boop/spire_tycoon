@@ -93,6 +93,8 @@ void main() {
     }
 
     expect(find.text('10'), findsOneWidget);
+    expect(find.byKey(const Key('dialogue-bubble')), findsOneWidget);
+    expect(find.text('Great hustle. The minotaurs noticed.'), findsOneWidget);
     expect(find.text('+1'), findsWidgets);
     expect(_upgradeColor(tester), const Color(0xFF10B981));
 

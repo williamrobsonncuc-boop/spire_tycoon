@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'dialogue.dart';
 import 'floor_catalog.dart';
 import 'formulas.dart';
 import 'managers.dart';
@@ -101,6 +102,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
+  String? lastQuip;
+  int _quipIndex = 0;
 
   /// Welcome-back rewards the player has not collected yet.
   double pendingOfflineGold = 0;
@@ -311,6 +314,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void tapLobby() {
     gold = roundMoney(gold + goldPerTap);
+    lastQuip = corporateLines[_quipIndex % corporateLines.length];
+    _quipIndex += 1;
     _touch();
   }
 

@@ -43,9 +43,32 @@ class FloorCard extends StatelessWidget {
             style: const TextStyle(color: cream, fontSize: 14, height: 1.35),
           ),
           const SizedBox(height: 12),
-          if (index == 0)
-            _LobbyTap(game: game)
-          else
+          if (index == 0) ...[
+            _LobbyTap(game: game),
+            if (game.lastQuip != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                key: const Key('dialogue-bubble'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: navy,
+                  borderRadius: BorderRadius.circular(cornerRadius),
+                ),
+                child: Text(
+                  game.lastQuip!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: cream,
+                    fontSize: 14,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ] else
             Center(
               child: Text(recipe.emoji, style: const TextStyle(fontSize: 48)),
             ),
