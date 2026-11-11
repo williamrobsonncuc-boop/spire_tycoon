@@ -71,7 +71,7 @@ String rarityLabel(ManagerRarity rarity) {
 ///
 /// Common 75%, Rare 18%, Epic 6%, Legendary 1%.
 ManagerRarity rarityForRoll(double roll) {
-  if (roll < 0.75) {
+  if (roll.isNaN || roll < 0.75) {
     return ManagerRarity.common;
   }
   if (roll < 0.93) {

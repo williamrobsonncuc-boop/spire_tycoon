@@ -23,3 +23,9 @@ flutter run -d chrome
 - Sounds: a coin clink on tap, an office ding when you build or upgrade, a latch when a briefcase opens, and a buzz when a pipe clogs or an orc falls asleep. The mute button is in the header. The wav files in `assets/sounds` are original sine tones generated for this project, not samples from a sound library.
 - First day: the lights start dark, a phone note appoints you CEO of Spire Corp, you hire the receptionist as an intern, you build Floor 2, and a free briefcase is guaranteed Epic.
 - Practice shop: Intern Pack £1.99, Manager's Choice £14.99, Boardroom Vault £89.99, Coffee Pass £4.99/mo, Executive Platinum £9.99/mo. Test purchase grants TEST diamonds. No real payment is taken.
+- Weekend subsidiary: on Saturday and Sunday you can file one report a day. The leaderboard is a local stand-in, not a live server. A daily check-in streak pays 10 gold times the streak.
+
+## Changelog
+
+- Weekend subsidiary and daily check-in.
+- Bug hunt: huge upgrade costs and build timers no longer throw or become free; NaN, infinity, and negative balances load as zero; a broken floor in a save is skipped; a corrupted save still opens Floor 1; leaving the app for under 30 seconds still pays that gap, and longer absences stay capped at 8 hours.

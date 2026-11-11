@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'formulas.dart';
 
 /// What a floor does once construction finishes.
@@ -160,7 +158,7 @@ double floorBaseGold(int index) {
   if (index == 0) {
     return 0.2;
   }
-  var base = 0.4 * pow(1.58, index).toDouble();
+  var base = 0.4 * safePow(1.58, index);
   if (index == 1) {
     // High volume. The low margin shows up in the upgrade price.
     base *= 2.2;
@@ -187,15 +185,22 @@ double floorBuildCost(int index) {
   if (index <= 0) {
     return 0;
   }
-  return roundMoney((80 * pow(1.75, index)).toDouble());
+  return positiveCost(80 * safePow(1.75, index));
 }
 
-/// How long construction takes, in seconds. Also grows without a cap.
+/// How long construction takes, in seconds.
+///
+/// The timer grows with the floor, then stops at about 68 years so a very
+/// high floor still has a number Dart can store.
 int floorBuildSeconds(int index) {
   if (index <= 0) {
     return 0;
   }
-  return (10 * pow(1.42, index)).round();
+  final raw = 10 * safePow(1.42, index);
+  if (raw >= 2000000000) {
+    return 2000000000;
+  }
+  return raw.round();
 }
 
 /// Price of the next upgrade on a floor that is already running.
@@ -208,19 +213,9 @@ double floorUpgradeCost(int index, int level) {
     return deskUpgradeCost(level);
   }
   final multiplier = index == 1 ? 1.15 : (index < 8 ? 1.12 : 1.15);
+  final steps = level < 0 ? 0 : level;
   final base = floorBuildCost(index) * (index == 1 ? 0.85 : 0.55);
-  return roundMoney((base * pow(multiplier, level)).toDouble());
-}
-
-/// Rounds tiny amounts to a tenth, and leaves huge amounts as-is.
-double roundMoney(double value) {
-  if (value.isNaN || value.isInfinite) {
-    return 0;
-  }
-  if (value.abs() < 1000) {
-    return roundTenths(value);
-  }
-  return value;
+  return positiveCost(base * safePow(multiplier, steps));
 }
 
 String formatBuildTime(int seconds) {
