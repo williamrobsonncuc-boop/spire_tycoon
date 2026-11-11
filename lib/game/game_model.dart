@@ -326,6 +326,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _touch();
   }
 
+  /// Practice shop. Adds labelled TEST diamonds. No payment is taken.
+  void grantTestDiamonds(int amount) {
+    if (amount <= 0) {
+      return;
+    }
+    testDiamonds += amount;
+    _touch();
+  }
+
   void toggleMute() {
     muted = !muted;
     _touch();

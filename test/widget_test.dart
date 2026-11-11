@@ -330,6 +330,15 @@ void main() {
     expect(again.muted, isTrue);
   });
 
+  test('a test purchase adds TEST diamonds and no real charge', () {
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.grantTestDiamonds(5);
+    expect(game.testDiamonds, 5);
+    game.grantTestDiamonds(40);
+    expect(game.testDiamonds, 45);
+  });
+
   test('first day ends with a guaranteed epic briefcase', () async {
     SharedPreferences.setMockInitialValues({});
     final game = GameModel(enableIdleTicks: false);
@@ -412,6 +421,31 @@ void main() {
     expect(find.textContaining('Epic 6%'), findsOneWidget);
     expect(find.textContaining('Legendary 1%'), findsOneWidget);
     expect(find.text('Need 1 Gold Ticket'), findsOneWidget);
+  });
+
+  testWidgets('the practice shop shows prices and grants TEST diamonds', (
+    tester,
+  ) async {
+    _useTallWindow(tester);
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
+
+    await tester.tap(find.byKey(const Key('open-shop')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('practice-shop')), findsOneWidget);
+    expect(find.textContaining('£1.99'), findsOneWidget);
+    expect(find.textContaining('£14.99'), findsOneWidget);
+    expect(find.textContaining('£89.99'), findsOneWidget);
+    expect(find.textContaining('£4.99/mo'), findsOneWidget);
+    expect(find.textContaining('£9.99/mo'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('test-buy-intern')));
+    await tester.pump();
+    expect(game.testDiamonds, 5);
   });
 }
 
