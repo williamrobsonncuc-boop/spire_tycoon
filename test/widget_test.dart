@@ -250,6 +250,39 @@ void main() {
     expect(find.textContaining('Floor 30'), findsNothing);
   });
 
+  test(
+    'diamonds finish a build, ads halve it, and a sleeping orc pauses pay',
+    () {
+      final clock = DateTime.utc(2026, 4, 1, 10);
+      var now = clock;
+      final game = GameModel(
+        enableIdleTicks: false,
+        now: () => now,
+        crisisChance: 1,
+      );
+      addTearDown(game.dispose);
+      game.floors[0] = FloorProgress(running: true);
+      game.gold = 100000;
+      game.testDiamonds = 1;
+      game.startBuild(1);
+      final full = game.buildSecondsLeft(1)!;
+      game.halveBuild(1);
+      expect(game.buildSecondsLeft(1), (full / 2).ceil());
+
+      game.skipBuildWithDiamond(1);
+      expect(game.isRunning(1), isTrue);
+      expect(game.testDiamonds, 0);
+      expect(game.goldTickets, 1);
+
+      game.advanceOneSecond();
+      expect(game.floors[1]!.sleeping, isTrue);
+      expect(game.goldRateFor(1), 0);
+      game.wakeFloor(1);
+      expect(game.floors[1]!.sleeping, isFalse);
+      expect(game.goldRateFor(1), greaterThan(0));
+    },
+  );
+
   test('briefcase odds match the posted 75 / 18 / 6 / 1 split', () {
     expect(rarityForRoll(0), ManagerRarity.common);
     expect(rarityForRoll(0.749), ManagerRarity.common);

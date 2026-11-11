@@ -4,6 +4,7 @@ import '../game/floor_catalog.dart';
 import '../game/formulas.dart';
 import '../game/game_model.dart';
 import '../theme/app_colors.dart';
+import 'sponsor_memo.dart';
 
 /// One floor in the scrolling tower. ListView builds only the ones on screen.
 class FloorCard extends StatelessWidget {
@@ -52,6 +53,8 @@ class FloorCard extends StatelessWidget {
           if (progress.running) ...[
             if (progress.clogged)
               _ClogBanner(onClear: () => game.clearClog(index))
+            else if (progress.sleeping)
+              _SleepBanner(onWake: () => game.wakeFloor(index))
             else
               _RunningSummary(game: game, index: index),
             const SizedBox(height: 8),
@@ -282,20 +285,78 @@ class _BuildingBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final left = game.buildSecondsLeft(index) ?? 0;
+    final canSkip = game.testDiamonds >= 1;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: navy,
         borderRadius: BorderRadius.circular(cornerRadius),
       ),
-      child: Text(
-        'Under construction · ${formatBuildTime(left)} left',
-        key: Key('building-$index'),
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: cyan,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
+      child: Column(
+        children: [
+          Text(
+            'Under construction · ${formatBuildTime(left)} left',
+            key: Key('building-$index'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: cyan,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: Key('skip-diamond-$index'),
+            onPressed: canSkip ? () => game.skipBuildWithDiamond(index) : null,
+            child: Text(
+              canSkip
+                  ? 'Spend 1 TEST diamond to finish'
+                  : 'Need 1 TEST diamond to finish now',
+            ),
+          ),
+          TextButton(
+            key: Key('halve-build-$index'),
+            onPressed: () async {
+              await showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const SponsorMemo(),
+              );
+              game.halveBuild(index);
+            },
+            child: const Text('Watch sponsor memo to halve the timer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SleepBanner extends StatelessWidget {
+  const _SleepBanner({required this.onWake});
+
+  final VoidCallback onWake;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: crimson,
+      borderRadius: BorderRadius.circular(cornerRadius),
+      child: InkWell(
+        key: const Key('wake-orc'),
+        borderRadius: BorderRadius.circular(cornerRadius),
+        onTap: onWake,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Text(
+            '! Sleeping orc. Tap to wake the crew.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: cream,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );

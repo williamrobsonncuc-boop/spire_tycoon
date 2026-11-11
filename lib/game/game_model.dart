@@ -22,12 +22,16 @@ class FloorProgress {
     this.running = false,
     this.constructionEndsMs,
     this.clogged = false,
+    this.sleeping = false,
   });
 
   int level;
   bool running;
   int? constructionEndsMs;
   bool clogged;
+
+  /// A sleeping orc stops this floor until the player taps it.
+  bool sleeping;
 
   bool get isBuilding => !running && constructionEndsMs != null;
 
@@ -41,6 +45,9 @@ class FloorProgress {
     if (clogged) {
       flags |= 2;
     }
+    if (sleeping) {
+      flags |= 4;
+    }
     return [index, level, flags, constructionEndsMs ?? 0];
   }
 
@@ -52,6 +59,7 @@ class FloorProgress {
       level: level,
       running: (flags & 1) != 0,
       clogged: (flags & 2) != 0,
+      sleeping: (flags & 4) != 0,
       constructionEndsMs: until == 0 ? null : until,
     );
   }
@@ -63,6 +71,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     DateTime Function()? now,
     this.enableIdleTicks = true,
     this.clogChance = 0.03,
+    this.crisisChance = 0.02,
     Random? random,
   }) : _now = now ?? DateTime.now,
        _random = random ?? Random();
@@ -72,6 +81,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Chance, once a second, that the bottling plant clogs. Tests set this to 1.
   final double clogChance;
+
+  /// Chance, once a second, that a running floor's orc falls asleep.
+  final double crisisChance;
   final Random _random;
 
   double gold = 0;
@@ -171,7 +183,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   double goldRateFor(int index) {
     final progress = floors[index];
-    if (progress == null || !progress.running || progress.clogged) {
+    if (progress == null ||
+        !progress.running ||
+        progress.clogged ||
+        progress.sleeping) {
       return 0;
     }
     if (floorKind(index) == FloorKind.compliance) {
@@ -338,6 +353,38 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _touch();
   }
 
+  void wakeFloor(int index) {
+    final progress = floors[index];
+    if (progress == null || !progress.sleeping) {
+      return;
+    }
+    progress.sleeping = false;
+    _touch();
+  }
+
+  /// Spends one TEST diamond to open the floor right now.
+  /// The usual "floor finished" diamond is not granted, so this actually costs one.
+  void skipBuildWithDiamond(int index) {
+    if (testDiamonds < 1 || !isBuilding(index)) {
+      return;
+    }
+    testDiamonds -= 1;
+    _openFloor(floors[index]!, grantDiamond: false);
+    _touch();
+  }
+
+  /// Cuts the remaining construction time in half. Used after the practice ad.
+  void halveBuild(int index) {
+    final left = buildSecondsLeft(index);
+    final progress = floors[index];
+    if (left == null || progress == null) {
+      return;
+    }
+    final halved = (left / 2).ceil();
+    progress.constructionEndsMs = _now().millisecondsSinceEpoch + halved * 1000;
+    _touch();
+  }
+
   void buyPolicy() {
     if (compliance + 0.001 < policyCost) {
       return;
@@ -356,6 +403,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _finishConstruction(now);
     _produce(const Duration(seconds: 1));
     _rollClogs();
+    _rollSleepingOrcs();
     _lastActive = now;
     notifyListeners();
     unawaited(persist());
@@ -414,11 +462,31 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     for (final progress in floors.values) {
       final ends = progress.constructionEndsMs;
       if (ends != null && !progress.running && ends <= nowMs) {
-        progress.running = true;
-        progress.constructionEndsMs = null;
-        // Milestone: a finished floor pays one ticket and one practice diamond.
-        goldTickets += 1;
-        testDiamonds += 1;
+        _openFloor(progress, grantDiamond: true);
+      }
+    }
+  }
+
+  void _openFloor(FloorProgress progress, {required bool grantDiamond}) {
+    progress.running = true;
+    progress.constructionEndsMs = null;
+    goldTickets += 1;
+    if (grantDiamond) {
+      testDiamonds += 1;
+    }
+  }
+
+  void _rollSleepingOrcs() {
+    for (final entry in floors.entries) {
+      if (entry.key == 0) {
+        continue;
+      }
+      final progress = entry.value;
+      if (!progress.running || progress.sleeping || progress.clogged) {
+        continue;
+      }
+      if (_random.nextDouble() < crisisChance) {
+        progress.sleeping = true;
       }
     }
   }
@@ -514,7 +582,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
           progress.running ||
           progress.isBuilding ||
           progress.level > 0 ||
-          progress.clogged;
+          progress.clogged ||
+          progress.sleeping;
       if (touched) {
         stored.add(progress.toTuple(index));
       }
