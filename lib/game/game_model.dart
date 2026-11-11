@@ -100,6 +100,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// Prestige currency. Each point is +10% gold. Restructuring grants it later.
   int equity = 0;
 
+  /// When true, the office stays quiet. Saved with the rest of the game.
+  bool muted = false;
+
   final Map<ManagerId, int> managers = {};
   ManagerId? lastHire;
   String? lastQuip;
@@ -310,6 +313,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _startIdleTimer();
     _listenForBackground();
     notifyListeners();
+  }
+
+  void toggleMute() {
+    muted = !muted;
+    _touch();
   }
 
   void tapLobby() {
@@ -566,6 +574,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       goldTickets = (map['tickets'] as num?)?.toInt() ?? 0;
       testDiamonds = (map['diamonds'] as num?)?.toInt() ?? 0;
       equity = (map['equity'] as num?)?.toInt() ?? 0;
+      muted = (map['muted'] as num?) == 1;
       managers.clear();
       final rawManagers = map['managers'];
       if (rawManagers is Map) {
@@ -611,6 +620,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       testDiamonds = 0;
       equity = 0;
       managers.clear();
+      muted = false;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -642,6 +652,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'tickets': goldTickets,
       'diamonds': testDiamonds,
       'equity': equity,
+      'muted': muted ? 1 : 0,
       'managers': {
         for (final entry in managers.entries)
           if (entry.value > 0) entry.key.name: entry.value,

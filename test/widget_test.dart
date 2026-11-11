@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
 import 'package:spire_tycoon/game/game_model.dart';
+import 'package:spire_tycoon/game/sound_board.dart';
 import 'package:spire_tycoon/game/managers.dart';
 import 'package:spire_tycoon/main.dart';
 
@@ -14,6 +15,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    SoundBoard.suppressForTests = true;
   });
 
   test('desk upgrade cost is 10 × 1.10^level', () {
@@ -311,6 +313,20 @@ void main() {
     expect(game.isRunning(1), isFalse);
     // 12 equity points is +120% gold, so the lobby's 0.2/sec becomes 0.44.
     expect(game.goldPerSecond, closeTo(0.44, 0.001));
+  });
+
+  test('mute is saved with the rest of the game', () async {
+    SharedPreferences.setMockInitialValues({});
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await game.load();
+    game.toggleMute();
+    await game.persist();
+
+    final again = GameModel(enableIdleTicks: false);
+    addTearDown(again.dispose);
+    await again.load();
+    expect(again.muted, isTrue);
   });
 
   test('briefcase odds match the posted 75 / 18 / 6 / 1 split', () {

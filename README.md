@@ -20,3 +20,4 @@ flutter run -d chrome
 - Construction can be finished with 1 TEST diamond, or a practice sponsor memo can cut the remaining time in half. Alchemy lines can clog, and other floors can get a sleeping orc. Tap the warning to clear it.
 - Corporate Restructuring resets gold, floors, tickets, policies, and staff. You keep Shareholder Equity. Each point adds 10% gold, including on the next endless tower. TEST diamonds are kept.
 - Tapping the receptionist pops a corporate line, such as "Can we circle back to this blood ritual after stand-up?"
+- Sounds: a coin clink on tap, an office ding when you build or upgrade, a latch when a briefcase opens, and a buzz when a pipe clogs or an orc falls asleep. The mute button is in the header. The wav files in `assets/sounds` are original sine tones generated for this project, not samples from a sound library.

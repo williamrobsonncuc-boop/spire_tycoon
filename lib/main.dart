@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'game/game_model.dart';
+import 'game/sound_board.dart';
 import 'screens/tower_page.dart';
 import 'theme/app_colors.dart';
 
@@ -21,6 +22,7 @@ class SpireTycoonApp extends StatefulWidget {
 class _SpireTycoonAppState extends State<SpireTycoonApp> {
   late final GameModel _game;
   late final bool _ownsGame;
+  final SoundBoard _sounds = SoundBoard();
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _SpireTycoonAppState extends State<SpireTycoonApp> {
 
   @override
   void dispose() {
+    _sounds.dispose();
     if (_ownsGame) {
       _game.dispose();
     }
@@ -40,6 +43,15 @@ class _SpireTycoonAppState extends State<SpireTycoonApp> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _game,
+      builder: (context, _) {
+        return OfficeSounds(board: _sounds, muted: _game.muted, child: _app());
+      },
+    );
+  }
+
+  MaterialApp _app() {
     return MaterialApp(
       title: 'Spire Tycoon',
       debugShowCheckedModeBanner: false,
