@@ -231,6 +231,25 @@ class _TowerNotes extends StatelessWidget {
         ],
         if (game.tutorialStep > 0 && game.tutorialStep < 4)
           _TutorialBanner(game: game),
+        if (game.autoUpgradeUnlocked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Auto-upgrade buys the cheapest floor upgrade once a second.',
+                    style: TextStyle(color: cream, fontSize: 14),
+                  ),
+                ),
+                Switch(
+                  key: const Key('auto-upgrade'),
+                  value: game.autoUpgrade,
+                  onChanged: (_) => game.toggleAutoUpgrade(),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

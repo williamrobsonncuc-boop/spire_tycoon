@@ -13,6 +13,9 @@ enum FloorKind {
 
   /// Compliance Points instead of gold. HR & Legal.
   compliance,
+
+  /// Steady gold, paid at 1.5×. Appears only after two restructurings.
+  nightShift,
 }
 
 /// How often the necromancy floor dumps its banked payout.
@@ -220,7 +223,12 @@ const List<String> _products = [
   'ink contracts',
 ];
 
-FloorRecipe floorRecipe(int index) {
+/// Later floors that become Night Shift once the player has restructured twice.
+bool isNightShiftFloor(int index) {
+  return index >= 15 && index % 7 == 0 && !isBossFloor(index);
+}
+
+FloorRecipe floorRecipe(int index, {int prestige = 0}) {
   if (index < _designedFloors.length) {
     return _designedFloors[index];
   }
@@ -232,6 +240,17 @@ FloorRecipe floorRecipe(int index) {
   final emoji = district.emoji[generated % district.emoji.length];
   final product = _products[generated % _products.length];
   final suffix = cycle == 0 ? '' : ' ${_roman(cycle + 1)}';
+  if (prestige >= 2 && isNightShiftFloor(index)) {
+    return FloorRecipe(
+      index: index,
+      name: 'Night Shift ($monster)',
+      emoji: '🌙',
+      blurb:
+          '${district.name}. Unlocked by a second restructuring. Night staff pay half again as much gold.',
+      kind: FloorKind.nightShift,
+      creature: monster,
+    );
+  }
   return FloorRecipe(
     index: index,
     name: '$department$suffix ($monster)',
@@ -243,7 +262,8 @@ FloorRecipe floorRecipe(int index) {
   );
 }
 
-FloorKind floorKind(int index) => floorRecipe(index).kind;
+FloorKind floorKind(int index, {int prestige = 0}) =>
+    floorRecipe(index, prestige: prestige).kind;
 
 String creatureOnFloor(int index) => floorRecipe(index).creature;
 
@@ -272,8 +292,9 @@ String bossChallengeName(int index) {
 }
 
 /// Gold (or the average gold, for the slow floor) at upgrade level 0.
-double floorBaseGold(int index) {
-  if (floorKind(index) == FloorKind.compliance) {
+double floorBaseGold(int index, {int prestige = 0}) {
+  final kind = floorKind(index, prestige: prestige);
+  if (kind == FloorKind.compliance) {
     return 0;
   }
   if (index == 0) {
@@ -284,8 +305,11 @@ double floorBaseGold(int index) {
     // High volume. The low margin shows up in the upgrade price.
     base *= 2.2;
   }
-  if (floorKind(index) == FloorKind.slowBurst) {
+  if (kind == FloorKind.slowBurst) {
     base *= 3;
+  }
+  if (kind == FloorKind.nightShift) {
+    base *= 1.5;
   }
   return base;
 }

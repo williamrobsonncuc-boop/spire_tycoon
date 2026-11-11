@@ -12,6 +12,7 @@ import 'floor_catalog.dart';
 import 'formulas.dart';
 import 'managers.dart';
 import 'market.dart';
+import 'prestige.dart';
 import 'weekend.dart';
 
 /// One JSON blob in shared_preferences. On Chrome that is localStorage.
@@ -210,6 +211,37 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   int get restructuringEquity =>
       highestRunningFloor < 1 ? 0 : highestRunningFloor;
 
+  /// How many times this tower has been restructured. Unlocks stay.
+  int restructures = 0;
+
+  /// Cosmetic background. "standard" follows the district tint.
+  String selectedSkin = 'standard';
+
+  /// Buys the cheapest running-floor upgrade once a second.
+  bool autoUpgrade = false;
+
+  bool get autoUpgradeUnlocked => restructures >= 3;
+
+  String get nextPrestigePreview {
+    for (final reward in prestigeRewards) {
+      if (restructures < reward.at) {
+        return 'Next restructuring unlocks ${reward.title}. ${reward.detail}';
+      }
+    }
+    return 'Every later restructuring still adds Shareholder Equity. The listed rewards are already yours.';
+  }
+
+  String get unlockedPrestigeSummary {
+    final names = [
+      for (final reward in prestigeRewards)
+        if (restructures >= reward.at) reward.title,
+    ];
+    if (names.isEmpty) {
+      return 'No restructuring rewards yet.';
+    }
+    return 'Unlocked: ${names.join(', ')}.';
+  }
+
   /// Stars, capped at 5. A sixth copy becomes a Gold Ticket instead.
   int copies(ManagerId id) {
     final count = managers[id] ?? 0;
@@ -355,11 +387,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         progress.sleeping) {
       return 0;
     }
-    if (floorKind(index) == FloorKind.compliance) {
+    if (floorKind(index, prestige: restructures) == FloorKind.compliance) {
       return 0;
     }
     var rate =
-        floorBaseGold(index) *
+        floorBaseGold(index, prestige: restructures) *
         (1 + progress.level) *
         goldMultiplier *
         speedBonus *
@@ -382,7 +414,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (progress == null || !progress.running) {
       return 0;
     }
-    if (floorKind(index) != FloorKind.compliance) {
+    if (floorKind(index, prestige: restructures) != FloorKind.compliance) {
       return 0;
     }
     return floorBaseCompliance(index) *
@@ -414,7 +446,31 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _touch();
   }
 
-  int get districtTint => districtAt(highestDistrict).tint;
+  int get districtTint {
+    final skin = towerSkinById(selectedSkin);
+    if (skin != null && skin.tint != 0 && restructures >= skin.unlockAt) {
+      return skin.tint;
+    }
+    return districtAt(highestDistrict).tint;
+  }
+
+  void selectSkin(String id) {
+    final skin = towerSkinById(id);
+    if (skin == null || restructures < skin.unlockAt) {
+      return;
+    }
+    selectedSkin = id;
+    _touch();
+  }
+
+  void toggleAutoUpgrade() {
+    if (!autoUpgradeUnlocked) {
+      autoUpgrade = false;
+      return;
+    }
+    autoUpgrade = !autoUpgrade;
+    _touch();
+  }
 
   void _noteDistrict(int floorIndex, {required bool announce}) {
     final district = districtIndexForFloor(floorIndex);
@@ -775,6 +831,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     equity += gain;
+    restructures += 1;
+    if (restructures > 100) {
+      restructures = 100;
+    }
     gold = 0;
     compliance = 0;
     policyLevel = 0;
@@ -821,6 +881,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _rollClogs();
     _rollSleepingOrcs();
     _rollOfficeEvent();
+    _autoUpgrade();
     _checkAchievements();
     _lastActive = now;
     notifyListeners();
@@ -855,7 +916,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     var goldGain = 0.0;
     var complianceGain = 0.0;
     for (final index in floors.keys.toList()) {
-      final kind = floorKind(index);
+      final kind = floorKind(index, prestige: restructures);
       if (kind == FloorKind.slowBurst) {
         final rate = goldRateFor(index);
         if (rate <= 0) {
@@ -1068,6 +1129,29 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _autoUpgrade() {
+    if (!autoUpgrade || !autoUpgradeUnlocked) {
+      return;
+    }
+    int? bestIndex;
+    var bestCost = double.infinity;
+    for (final entry in floors.entries) {
+      final progress = entry.value;
+      if (!progress.running) {
+        continue;
+      }
+      final cost = floorUpgradeCost(entry.key, progress.level);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestIndex = entry.key;
+      }
+    }
+    if (bestIndex == null || gold + 0.001 < bestCost) {
+      return;
+    }
+    upgradeFloor(bestIndex);
+  }
+
   void _expireEvent(DateTime now) {
     if (officeEvent == OfficeEvent.boom &&
         now.millisecondsSinceEpoch >= eventEndsMs) {
@@ -1110,7 +1194,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void _rollClogs() {
     for (final entry in floors.entries) {
-      if (floorKind(entry.key) != FloorKind.clog) {
+      if (floorKind(entry.key, prestige: restructures) != FloorKind.clog) {
         continue;
       }
       final progress = entry.value;
@@ -1284,6 +1368,20 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (officeEvent != OfficeEvent.boom) {
         eventEndsMs = 0;
       }
+      restructures = (map['restructures'] as num?)?.toInt() ?? 0;
+      if (restructures < 0) {
+        restructures = 0;
+      }
+      if (restructures > 100) {
+        restructures = 100;
+      }
+      final rawSkin = map['skin'];
+      selectedSkin = rawSkin is String ? rawSkin : 'standard';
+      if (towerSkinById(selectedSkin) == null ||
+          restructures < (towerSkinById(selectedSkin)?.unlockAt ?? 1)) {
+        selectedSkin = 'standard';
+      }
+      autoUpgrade = (map['autoUpgrade'] as num?) == 1 && restructures >= 3;
       final rawWait = map['eventWait'];
       final wait = rawWait is num ? rawWait.toInt() : null;
       if (wait == null || wait < 0 || wait > eventGap) {
@@ -1370,6 +1468,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       for (var i = 0; i < researchLevels.length; i++) {
         researchLevels[i] = 0;
       }
+      restructures = 0;
+      selectedSkin = 'standard';
+      autoUpgrade = false;
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -1436,6 +1537,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'weeklyBuildClaimed': weeklyBuildClaimed,
       'weeklyRecruitClaimed': weeklyRecruitClaimed,
       'research': researchLevels,
+      'restructures': restructures,
+      'skin': selectedSkin,
+      'autoUpgrade': autoUpgrade ? 1 : 0,
       'event': officeEvent?.name ?? '',
       'eventEndsMs': eventEndsMs,
       'eventWait': _eventWait,

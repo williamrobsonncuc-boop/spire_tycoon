@@ -321,6 +321,7 @@ void main() {
     expect(game.isRunning(1), isFalse);
     // 12 equity points is +120% gold, so the lobby's 0.2/sec becomes 0.44.
     expect(game.goldPerSecond, closeTo(0.44, 0.001));
+    expect(game.restructures, 1);
   });
 
   test('mute is saved with the rest of the game', () async {
@@ -952,6 +953,95 @@ void main() {
     await tester.tap(find.byKey(const Key('office-event')));
     await tester.pump();
     expect(game.officeEvent, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'restructuring unlocks a skin, night shift, then auto-upgrade',
+    () async {
+      expect(isNightShiftFloor(49), isFalse);
+      expect(floorRecipe(21).kind, FloorKind.gold);
+      expect(floorRecipe(5, prestige: 4).name, 'Marketing (Imps)');
+      expect(
+        floorBaseGold(21, prestige: 2),
+        closeTo(floorBaseGold(21) * 1.5, 0.001),
+      );
+      expect(floorRecipe(21, prestige: 2).kind, FloorKind.nightShift);
+
+      final game = GameModel(enableIdleTicks: false);
+      addTearDown(game.dispose);
+      game.floors[0] = FloorProgress(running: true);
+      game.floors[1] = FloorProgress(running: true);
+      expect(game.nextPrestigePreview, contains('Brass'));
+      game.restructure();
+      expect(game.restructures, 1);
+      expect(game.nextPrestigePreview, contains('Night Shift'));
+      game.selectSkin('aurora');
+      expect(game.selectedSkin, 'standard');
+      game.selectSkin('brass');
+      expect(game.districtTint, 0xFF3F2E1E);
+      game.selectSkin('nope');
+      expect(game.selectedSkin, 'brass');
+
+      game.restructures = 2;
+      game.floors[21] = FloorProgress(running: true);
+      expect(
+        game.goldRateFor(21),
+        closeTo(floorBaseGold(21, prestige: 2) * game.equityMultiplier, 0.001),
+      );
+
+      game.gold = 1000;
+      game.autoUpgrade = true;
+      game.advanceOneSecond();
+      expect(game.lobbyLevel, 0);
+
+      game.restructures = 3;
+      game.autoUpgrade = true;
+      game.floors.remove(21);
+      game.advanceOneSecond();
+      expect(game.lobbyLevel, 1);
+      game.gold = 0;
+      game.advanceOneSecond();
+      expect(game.lobbyLevel, 1);
+
+      game.restructures = 4;
+      expect(game.nextPrestigePreview, contains('Shareholder Equity'));
+
+      SharedPreferences.setMockInitialValues({
+        saveKey: jsonEncode({
+          'restructures': -4,
+          'skin': 'aurora',
+          'autoUpgrade': 1,
+          'gold': 3,
+        }),
+      });
+      final loaded = GameModel(enableIdleTicks: false);
+      addTearDown(loaded.dispose);
+      await loaded.load();
+      expect(loaded.restructures, 0);
+      expect(loaded.selectedSkin, 'standard');
+      expect(loaded.autoUpgrade, isFalse);
+      expect(loaded.gold, 3);
+    },
+  );
+
+  testWidgets('the restructure dialog previews the next reward', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
+    await tester.tap(find.byKey(const Key('open-restructure')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('next-prestige')), findsOneWidget);
+    expect(find.textContaining('Brass After Hours'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

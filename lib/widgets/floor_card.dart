@@ -16,7 +16,7 @@ class FloorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final recipe = floorRecipe(index);
+    final recipe = floorRecipe(index, prestige: game.restructures);
     final progress = game.progressOf(index);
     final previousReady = index == 0 || game.isRunning(index - 1);
 
@@ -111,7 +111,7 @@ class _RunningSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kind = floorKind(index);
+    final kind = floorKind(index, prestige: game.restructures);
     final String line;
     if (kind == FloorKind.compliance) {
       final rate = game.complianceRateFor(index);
@@ -518,7 +518,7 @@ class _UpgradeButton extends StatelessWidget {
     final title = index == 0 ? 'Upgrade Desk' : 'Upgrade floor';
     final effect = index == 0
         ? '+1 gold per tap'
-        : floorKind(index) == FloorKind.compliance
+        : floorKind(index, prestige: game.restructures) == FloorKind.compliance
         ? '+compliance each second'
         : '+gold each second';
 
