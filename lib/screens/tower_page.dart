@@ -87,38 +87,49 @@ class _TowerPageState extends State<TowerPage> {
         return Scaffold(
           key: const Key('game-ready'),
           backgroundColor: navy,
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Column(
-                    children: [
-                      _TowerHeader(game: game),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: (notification) {
-                            if (notification is ScrollUpdateNotification) {
-                              _revealMoreIfNeeded(notification.metrics);
-                            }
-                            return false;
-                          },
-                          child: ListView.builder(
-                            key: const Key('tower-list'),
-                            itemCount: _shown,
-                            itemBuilder: (context, index) {
-                              return FloorCard(game: game, index: index);
-                            },
+          body: Stack(
+            children: [
+              SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Column(
+                        children: [
+                          _TowerHeader(game: game),
+                          if (game.tutorialStep > 0 &&
+                              game.tutorialStep < 4) ...[
+                            const SizedBox(height: 8),
+                            _TutorialBanner(game: game),
+                          ],
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (notification is ScrollUpdateNotification) {
+                                  _revealMoreIfNeeded(notification.metrics);
+                                }
+                                return false;
+                              },
+                              child: ListView.builder(
+                                key: const Key('tower-list'),
+                                itemCount: _shown,
+                                itemBuilder: (context, index) {
+                                  return FloorCard(game: game, index: index);
+                                },
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+              if (game.tutorialStep == 0)
+                _AppointmentNotice(onAccept: game.acceptAppointment),
+            ],
           ),
         );
       },
@@ -221,6 +232,126 @@ class _TowerHeader extends StatelessWidget {
             Text(
               'Compliance ${formatNumber(game.compliance)} · +${formatNumber(game.compliancePerSecond)} / sec · policies +${game.policyLevel * 10}%',
               style: const TextStyle(color: cream, fontSize: 13),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AppointmentNotice extends StatelessWidget {
+  const _AppointmentNotice({required this.onAccept});
+
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xF20F172A),
+      child: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Container(
+              margin: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: slate,
+                borderRadius: BorderRadius.circular(cornerRadius),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'PHONE',
+                    style: TextStyle(
+                      color: cream,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'CONGRATULATIONS: You have been appointed CEO of Spire Corp.',
+                    key: Key('tutorial-appointment'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: cream,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'The lights are off. The goblin is waiting. This is your first day.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: cream, fontSize: 15),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    key: const Key('tutorial-accept'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: emerald,
+                      foregroundColor: cream,
+                    ),
+                    onPressed: onAccept,
+                    child: const Text('Accept the appointment'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TutorialBanner extends StatelessWidget {
+  const _TutorialBanner({required this.game});
+
+  final GameModel game;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = game.tutorialStep;
+    final String message;
+    if (step == 1) {
+      message = 'Tap the receptionist. That hires your first intern.';
+    } else if (step == 2) {
+      message = 'Build Floor 2, the Dragon Forge.';
+    } else {
+      message =
+          'Your welcome briefcase is guaranteed Epic. Brutus is in there.';
+    }
+
+    return Container(
+      key: const Key('tutorial-banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: slate,
+        borderRadius: BorderRadius.circular(cornerRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            message,
+            style: const TextStyle(color: cream, fontSize: 15, height: 1.3),
+          ),
+          if (step == 3) ...[
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const Key('welcome-briefcase'),
+              style: FilledButton.styleFrom(
+                backgroundColor: emerald,
+                foregroundColor: cream,
+              ),
+              onPressed: game.openWelcomeBriefcase,
+              child: const Text('Open welcome briefcase'),
             ),
           ],
         ],

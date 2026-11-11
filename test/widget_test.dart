@@ -73,6 +73,7 @@ void main() {
     addTearDown(game.dispose);
     await tester.pumpWidget(SpireTycoonApp(game: game));
     await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
 
     expect(find.text('Floor 1: The Executive Lobby'), findsOneWidget);
     expect(find.text('0'), findsOneWidget);
@@ -329,6 +330,24 @@ void main() {
     expect(again.muted, isTrue);
   });
 
+  test('first day ends with a guaranteed epic briefcase', () async {
+    SharedPreferences.setMockInitialValues({});
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await game.load();
+    expect(game.tutorialStep, 0);
+    game.acceptAppointment();
+    game.tapLobby();
+    expect(game.tutorialStep, 2);
+    game.gold = 100000;
+    game.startBuild(1);
+    expect(game.tutorialStep, 3);
+    game.openWelcomeBriefcase();
+    expect(game.tutorialStep, 4);
+    expect(game.copies(ManagerId.brutus), 1);
+    expect(game.goldTickets, 0);
+  });
+
   test('briefcase odds match the posted 75 / 18 / 6 / 1 split', () {
     expect(rarityForRoll(0), ManagerRarity.common);
     expect(rarityForRoll(0.749), ManagerRarity.common);
@@ -381,6 +400,7 @@ void main() {
     addTearDown(game.dispose);
     await tester.pumpWidget(SpireTycoonApp(game: game));
     await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
 
     await tester.ensureVisible(find.byKey(const Key('open-recruitment')));
     await tester.tap(find.byKey(const Key('open-recruitment')));
@@ -400,6 +420,15 @@ void _useTallWindow(WidgetTester tester) {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _acceptAppointment(WidgetTester tester) async {
+  final button = find.byKey(const Key('tutorial-accept'));
+  if (button.evaluate().isEmpty) {
+    return;
+  }
+  await tester.tap(button);
+  await tester.pump();
 }
 
 Future<void> _pumpUntilReady(WidgetTester tester) async {

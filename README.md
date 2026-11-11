@@ -21,3 +21,4 @@ flutter run -d chrome
 - Corporate Restructuring resets gold, floors, tickets, policies, and staff. You keep Shareholder Equity. Each point adds 10% gold, including on the next endless tower. TEST diamonds are kept.
 - Tapping the receptionist pops a corporate line, such as "Can we circle back to this blood ritual after stand-up?"
 - Sounds: a coin clink on tap, an office ding when you build or upgrade, a latch when a briefcase opens, and a buzz when a pipe clogs or an orc falls asleep. The mute button is in the header. The wav files in `assets/sounds` are original sine tones generated for this project, not samples from a sound library.
+- First day: the lights start dark, a phone note appoints you CEO of Spire Corp, you hire the receptionist as an intern, you build Floor 2, and a free briefcase is guaranteed Epic.
