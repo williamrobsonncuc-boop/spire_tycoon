@@ -5,6 +5,7 @@ import '../game/game_model.dart';
 import '../theme/app_colors.dart';
 import '../widgets/floor_card.dart';
 import '../widgets/welcome_back_dialog.dart';
+import 'recruitment_page.dart';
 
 /// The whole spire. The list is lazy: Flutter only builds cards you can see,
 /// and scrolling near the bottom reveals more generated floors.
@@ -146,14 +147,30 @@ class _TowerHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'GOLD',
-            style: TextStyle(
-              color: cream,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-            ),
+          Row(
+            children: [
+              const Text(
+                'GOLD',
+                style: TextStyle(
+                  color: cream,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                key: const Key('open-recruitment'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => RecruitmentPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Briefcase'),
+              ),
+            ],
           ),
           Text(
             formatNumber(game.gold),
@@ -174,6 +191,10 @@ class _TowerHeader extends StatelessWidget {
             '+${formatNumber(game.goldPerSecond)} per second',
             key: const Key('gold-per-second'),
             style: const TextStyle(color: cream, fontSize: 15),
+          ),
+          Text(
+            'Tickets ${game.goldTickets} · TEST diamonds ${game.testDiamonds}',
+            style: const TextStyle(color: cream, fontSize: 13),
           ),
           if (showCompliance) ...[
             const SizedBox(height: 6),

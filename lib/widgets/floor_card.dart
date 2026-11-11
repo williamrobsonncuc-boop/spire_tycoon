@@ -237,7 +237,7 @@ class _BuildButton extends StatelessWidget {
       detail = 'Build the floor below first';
     } else {
       detail =
-          'Cost ${formatNumber(cost)} gold · ${formatBuildTime(floorBuildSeconds(index))}';
+          'Cost ${formatNumber(cost)} gold · ${formatBuildTime(game.constructionSeconds(index))}';
     }
 
     return Material(

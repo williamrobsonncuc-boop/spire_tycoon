@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'floor_catalog.dart';
 import 'formulas.dart';
+import 'managers.dart';
 
 /// One JSON blob in shared_preferences. On Chrome that is localStorage.
 const String saveKey = 'spire_tycoon_save_v1';
@@ -77,6 +78,18 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   double compliance = 0;
   int policyLevel = 0;
 
+  /// Milestone currency. One ticket each time a floor finishes building.
+  int goldTickets = 0;
+
+  /// Practice premium currency. Not bought with real money.
+  int testDiamonds = 0;
+
+  /// Prestige currency. Each point is +10% gold. Restructuring grants it later.
+  int equity = 0;
+
+  final Map<ManagerId, int> managers = {};
+  ManagerId? lastHire;
+
   /// Welcome-back rewards the player has not collected yet.
   double pendingOfflineGold = 0;
   double pendingCompliance = 0;
@@ -103,6 +116,31 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// +10% gold income per policy, forever (until a later prestige reset).
   double get goldMultiplier => 1 + policyLevel * 0.10;
+
+  /// Each Shareholder Equity point is another +10% gold.
+  double get equityMultiplier => 1 + equity * 0.10;
+
+  int copies(ManagerId id) => managers[id] ?? 0;
+
+  /// Gary's +2% speed per copy.
+  double get speedBonus => 1 + 0.02 * copies(ManagerId.gary);
+
+  /// Vlad's +300% offline earnings per copy. One Vlad means 4× offline gold.
+  double get offlineBonus => 1 + 3.0 * copies(ManagerId.vlad);
+
+  /// Construction time after Karen and the Lich. Cuts never pass 75%.
+  int constructionSeconds(int index) {
+    final base = floorBuildSeconds(index);
+    if (base <= 0) {
+      return 0;
+    }
+    var cut = 0.15 * copies(ManagerId.karen) + 0.50 * copies(ManagerId.lich);
+    if (cut > 0.75) {
+      cut = 0.75;
+    }
+    final seconds = (base * (1 - cut)).round();
+    return seconds < 1 ? 1 : seconds;
+  }
 
   double get policyCost => roundMoney((8 * pow(1.55, policyLevel)).toDouble());
 
@@ -139,7 +177,20 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (floorKind(index) == FloorKind.compliance) {
       return 0;
     }
-    return floorBaseGold(index) * (1 + progress.level) * goldMultiplier;
+    var rate =
+        floorBaseGold(index) *
+        (1 + progress.level) *
+        goldMultiplier *
+        speedBonus *
+        equityMultiplier;
+    // Gary's first copy doubles the forge. Brutus buffs every heavy floor.
+    if (index == 1 && copies(ManagerId.gary) > 0) {
+      rate *= 2;
+    }
+    if (isHeavyFloor(index) && copies(ManagerId.brutus) > 0) {
+      rate *= 1 + 0.40 * copies(ManagerId.brutus);
+    }
+    return rate;
   }
 
   double complianceRateFor(int index) {
@@ -201,14 +252,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _readSave(now);
 
     final away = now.difference(_lastActive ?? now);
-    final earnedGold = offlineEarnings(
-      goldPerSecond: goldPerSecond,
-      away: away,
-    );
-    final earnedCompliance = offlineEarnings(
-      goldPerSecond: compliancePerSecond,
-      away: away,
-    );
+    final earnedGold =
+        offlineEarnings(goldPerSecond: goldPerSecond, away: away) *
+        offlineBonus;
+    final earnedCompliance =
+        offlineEarnings(goldPerSecond: compliancePerSecond, away: away) *
+        offlineBonus;
     if (earnedGold > 0 || earnedCompliance > 0) {
       pendingOfflineGold = roundMoney(pendingOfflineGold + earnedGold);
       pendingCompliance = roundMoney(pendingCompliance + earnedCompliance);
@@ -249,7 +298,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     gold = roundMoney(gold - cost);
     floors[index] = FloorProgress(
       constructionEndsMs:
-          _now().millisecondsSinceEpoch + floorBuildSeconds(index) * 1000,
+          _now().millisecondsSinceEpoch + constructionSeconds(index) * 1000,
     );
     _touch();
   }
@@ -265,6 +314,18 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
     gold = roundMoney(gold - cost);
     progress.level += 1;
+    _touch();
+  }
+
+  /// Spends one Gold Ticket and hires whoever the roll lands on.
+  void openBriefcase({double? roll}) {
+    if (goldTickets < 1) {
+      return;
+    }
+    goldTickets -= 1;
+    final hire = managerForRoll(roll ?? _random.nextDouble());
+    managers[hire] = copies(hire) + 1;
+    lastHire = hire;
     _touch();
   }
 
@@ -355,6 +416,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (ends != null && !progress.running && ends <= nowMs) {
         progress.running = true;
         progress.constructionEndsMs = null;
+        // Milestone: a finished floor pays one ticket and one practice diamond.
+        goldTickets += 1;
+        testDiamonds += 1;
       }
     }
   }
@@ -385,6 +449,19 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       gold = (map['gold'] as num?)?.toDouble() ?? 0;
       compliance = (map['compliance'] as num?)?.toDouble() ?? 0;
       policyLevel = (map['policy'] as num?)?.toInt() ?? 0;
+      goldTickets = (map['tickets'] as num?)?.toInt() ?? 0;
+      testDiamonds = (map['diamonds'] as num?)?.toInt() ?? 0;
+      equity = (map['equity'] as num?)?.toInt() ?? 0;
+      managers.clear();
+      final rawManagers = map['managers'];
+      if (rawManagers is Map) {
+        for (final id in ManagerId.values) {
+          final count = rawManagers[id.name];
+          if (count is num && count > 0) {
+            managers[id] = count.toInt();
+          }
+        }
+      }
       _slowCharge = (map['slow'] as num?)?.toDouble() ?? 0;
       pendingOfflineGold = (map['pendingOfflineGold'] as num?)?.toDouble() ?? 0;
       pendingCompliance = (map['pendingCompliance'] as num?)?.toDouble() ?? 0;
@@ -416,6 +493,10 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       gold = 0;
       compliance = 0;
       policyLevel = 0;
+      goldTickets = 0;
+      testDiamonds = 0;
+      equity = 0;
+      managers.clear();
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -443,6 +524,13 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'gold': gold,
       'compliance': compliance,
       'policy': policyLevel,
+      'tickets': goldTickets,
+      'diamonds': testDiamonds,
+      'equity': equity,
+      'managers': {
+        for (final entry in managers.entries)
+          if (entry.value > 0) entry.key.name: entry.value,
+      },
       'slow': _slowCharge,
       'pendingOfflineGold': pendingOfflineGold,
       'pendingCompliance': pendingCompliance,
@@ -487,14 +575,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       final now = _now();
       final away = now.difference(_lastActive ?? now);
-      final earnedGold = offlineEarnings(
-        goldPerSecond: goldPerSecond,
-        away: away,
-      );
-      final earnedCompliance = offlineEarnings(
-        goldPerSecond: compliancePerSecond,
-        away: away,
-      );
+      final earnedGold =
+          offlineEarnings(goldPerSecond: goldPerSecond, away: away) *
+          offlineBonus;
+      final earnedCompliance =
+          offlineEarnings(goldPerSecond: compliancePerSecond, away: away) *
+          offlineBonus;
       _finishConstruction(now);
       _lastActive = now;
       if (earnedGold > 0 || earnedCompliance > 0) {
