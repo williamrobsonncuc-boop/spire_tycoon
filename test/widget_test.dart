@@ -76,7 +76,7 @@ void main() {
     WidgetTester tester,
   ) async {
     _useTallWindow(tester);
-    final game = GameModel(enableIdleTicks: false);
+    final game = GameModel(enableIdleTicks: false, critChanceOverride: 0);
     addTearDown(game.dispose);
     await tester.pumpWidget(SpireTycoonApp(game: game));
     await _pumpUntilReady(tester);
@@ -102,7 +102,8 @@ void main() {
       await tester.pump();
     }
 
-    expect(find.text('10'), findsOneWidget);
+    expect(find.text('12.5'), findsOneWidget);
+    expect(find.byKey(const Key('combo-meter')), findsOneWidget);
     expect(find.byKey(const Key('dialogue-bubble')), findsOneWidget);
     expect(find.text('Great hustle. The minotaurs noticed.'), findsOneWidget);
     expect(find.text('+1'), findsWidgets);
@@ -112,7 +113,7 @@ void main() {
     await tester.tap(find.byKey(const Key('upgrade-desk')));
     await tester.pump();
 
-    expect(find.text('0'), findsOneWidget);
+    expect(find.text('2.5'), findsOneWidget);
     expect(find.text('+2 per tap'), findsOneWidget);
     expect(find.text('Level 1'), findsOneWidget);
     expect(find.text('Cost 11 gold'), findsOneWidget);
@@ -522,15 +523,61 @@ void main() {
     expect(game.isRunning(0), isTrue);
   });
 
+  test('a crit pays ten times and a pause resets the combo', () {
+    var now = DateTime.utc(2026, 8, 1, 12);
+    final calm = GameModel(
+      enableIdleTicks: false,
+      critChanceOverride: 0,
+      now: () => now,
+    );
+    addTearDown(calm.dispose);
+    calm.floors[0] = FloorProgress(running: true);
+    expect(calm.tapLobby(), 1);
+    expect(calm.tapLobby(), closeTo(1.1, 0.001));
+    expect(calm.combo, 2);
+    now = now.add(const Duration(seconds: 3));
+    expect(calm.tapLobby(), 1);
+    expect(calm.combo, 1);
+    now = now.subtract(const Duration(minutes: 5));
+    expect(calm.tapLobby(), 1);
+    expect(calm.combo, 1);
+
+    final crit = GameModel(enableIdleTicks: false, critChanceOverride: 1);
+    addTearDown(crit.dispose);
+    crit.floors[0] = FloorProgress(running: true);
+    expect(crit.tapLobby(), 10);
+    expect(crit.lastTapWasCrit, isTrue);
+    expect(crit.critShake, 1);
+
+    final huge = GameModel(enableIdleTicks: false, critChanceOverride: 1);
+    addTearDown(huge.dispose);
+    huge.floors[0] = FloorProgress(level: 1000000000000, running: true);
+    expect(huge.tapLobby(), 1e12);
+    expect(huge.gold.isFinite, isTrue);
+
+    final lab = GameModel(enableIdleTicks: false);
+    addTearDown(lab.dispose);
+    expect(lab.critChance, closeTo(0.05, 0.0001));
+    lab.researchLevels[3] = 3;
+    expect(lab.critChance, closeTo(0.08, 0.0001));
+    lab.researchLevels[3] = 100;
+    expect(lab.critChance, closeTo(0.15, 0.0001));
+    final pinned = GameModel(enableIdleTicks: false, critChanceOverride: -1);
+    addTearDown(pinned.dispose);
+    expect(pinned.critChance, 0);
+  });
+
   test('fifty quick taps add fifty gold', () async {
     SharedPreferences.setMockInitialValues({});
-    final game = GameModel(enableIdleTicks: false);
+    final game = GameModel(enableIdleTicks: false, critChanceOverride: 0);
     addTearDown(game.dispose);
     await game.load();
     for (var i = 0; i < 50; i++) {
       game.tapLobby();
     }
-    expect(game.gold, 50);
+    // Quick taps build a combo. The bonus stops at ×1.95, which rounds to 2.
+    expect(game.gold, 90);
+    expect(game.combo, 50);
   });
 
   test('a short background gap is paid and a long one is capped', () async {

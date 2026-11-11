@@ -79,6 +79,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     this.clogChance = 0.03,
     this.crisisChance = 0.02,
     this.eventGap = 180,
+    this.critChanceOverride,
     Random? random,
   }) : _now = now ?? DateTime.now,
        _random = random ?? Random(),
@@ -95,6 +96,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Seconds of the game being open between office events. 0 turns them off.
   final int eventGap;
+
+  /// Tests pin the crit roll. Null uses 5% plus research.
+  final double? critChanceOverride;
   int _eventWait;
   final Random _random;
 
@@ -290,6 +294,40 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   double get researchTapBonus => 1 + 0.02 * researchLevel(3);
+
+  /// 5% at the start. Heavier Taps adds 1% per level, and it never passes 25%.
+  double get critChance {
+    if (critChanceOverride != null) {
+      final pinned = critChanceOverride!;
+      if (pinned.isNaN || pinned.isInfinite || pinned <= 0) {
+        return 0;
+      }
+      return pinned > 1 ? 1 : pinned;
+    }
+    final chance = 0.05 + 0.01 * researchLevel(3);
+    if (chance.isNaN || chance.isInfinite || chance < 0) {
+      return 0;
+    }
+    return chance > 0.25 ? 0.25 : chance;
+  }
+
+  /// Taps within 2 seconds. The bonus stops growing at 20.
+  int combo = 1;
+  int _lastTapMs = 0;
+  bool lastTapWasCrit = false;
+  int critShake = 0;
+
+  double get comboBonus {
+    final steps = combo < 1 ? 1 : (combo > 20 ? 20 : combo);
+    return 1 + 0.05 * (steps - 1);
+  }
+
+  String get comboLabel {
+    if (combo <= 1) {
+      return '';
+    }
+    return 'Combo $combo · taps ×${comboBonus.toStringAsFixed(2)}';
+  }
 
   /// Gary's +2% speed per copy.
   double get speedBonus => 1 + 0.02 * copies(ManagerId.gary);
@@ -687,10 +725,36 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     _touch();
   }
 
-  void tapLobby() {
+  /// Returns the gold this tap actually added, after combo and a possible crit.
+  double tapLobby() {
     _syncQuests(_now());
     tapsToday += 1;
-    final gained = goldPerTap * researchTapBonus;
+    final nowMs = _now().millisecondsSinceEpoch;
+    final gap = nowMs - _lastTapMs;
+    if (_lastTapMs != 0 && gap >= 0 && gap <= 2000) {
+      combo += 1;
+      if (combo > 999) {
+        combo = 999;
+      }
+    } else {
+      combo = 1;
+    }
+    _lastTapMs = nowMs;
+    final roll = _random.nextDouble();
+    final crit = roll < critChance;
+    lastTapWasCrit = crit;
+    var gained = goldPerTap * researchTapBonus * comboBonus;
+    if (crit) {
+      gained *= 10;
+      critShake += 1;
+    }
+    if (gained.isNaN || gained.isInfinite || gained < 0) {
+      gained = 0;
+    }
+    if (gained > 1e12) {
+      gained = 1e12;
+    }
+    gained = roundMoney(gained);
     gold = roundMoney(gold + gained);
     _creditLifetime(gained);
     lastQuip = corporateLines[_quipIndex % corporateLines.length];
@@ -699,6 +763,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       tutorialStep = 2;
     }
     _touch();
+    return gained;
   }
 
   void startBuild(int index) {

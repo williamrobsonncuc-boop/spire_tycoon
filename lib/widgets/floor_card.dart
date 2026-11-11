@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../game/floor_catalog.dart';
@@ -46,6 +48,26 @@ class FloorCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (index == 0) ...[
             _LobbyTap(game: game),
+            const SizedBox(height: 8),
+            Text(
+              'Crit ${(game.critChance * 100).round()}% for ×10. A combo builds for 2 seconds.',
+              key: const Key('crit-odds'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: cream, fontSize: 13, height: 1.3),
+            ),
+            if (game.combo > 1) ...[
+              const SizedBox(height: 4),
+              Text(
+                game.comboLabel,
+                key: const Key('combo-meter'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: cyan,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
             if (game.lastQuip != null) ...[
               const SizedBox(height: 8),
               Container(
@@ -142,11 +164,11 @@ class _LobbyTap extends StatefulWidget {
   State<_LobbyTap> createState() => _LobbyTapState();
 }
 
-class _LobbyTapState extends State<_LobbyTap>
-    with SingleTickerProviderStateMixin {
+class _LobbyTapState extends State<_LobbyTap> with TickerProviderStateMixin {
   final List<_Pop> _pops = [];
   int _nextId = 0;
   late final AnimationController _bounce;
+  late final AnimationController _shake;
 
   @override
   void initState() {
@@ -160,23 +182,30 @@ class _LobbyTapState extends State<_LobbyTap>
         _bounce.reverse();
       }
     });
+    _shake = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
   }
 
   @override
   void dispose() {
     _bounce.dispose();
+    _shake.dispose();
     super.dispose();
   }
 
   void _tap() {
     OfficeSounds.play(context, SoundEffect.coin);
-    final gained = widget.game.goldPerTap;
-    widget.game.tapLobby();
+    final gained = widget.game.tapLobby();
     setState(() {
-      _pops.add(_Pop(_nextId, gained));
+      _pops.add(_Pop(_nextId, gained, widget.game.lastTapWasCrit));
       _nextId += 1;
     });
     _bounce.forward(from: 0);
+    if (widget.game.lastTapWasCrit) {
+      _shake.forward(from: 0);
+    }
   }
 
   @override
@@ -190,10 +219,15 @@ class _LobbyTapState extends State<_LobbyTap>
           Align(
             alignment: Alignment.bottomCenter,
             child: AnimatedBuilder(
-              animation: _bounce,
+              animation: Listenable.merge([_bounce, _shake]),
               builder: (context, child) {
                 final scale = 1 + (0.08 * _bounce.value);
-                return Transform.scale(scale: scale, child: child);
+                final wobble =
+                    sin(_shake.value * pi * 6) * 8 * (1 - _shake.value);
+                return Transform.translate(
+                  offset: Offset(wobble, 0),
+                  child: Transform.scale(scale: scale, child: child),
+                );
               },
               child: Material(
                 color: navy,
@@ -227,7 +261,8 @@ class _LobbyTapState extends State<_LobbyTap>
               child: IgnorePointer(
                 child: _GoldPop(
                   key: ValueKey<int>(pop.id),
-                  text: '+${pop.amount}',
+                  text: '+${formatNumber(pop.amount)}',
+                  crit: pop.crit,
                   onFinished: () {
                     if (!mounted) {
                       return;
@@ -616,10 +651,16 @@ class _PolicyButton extends StatelessWidget {
 }
 
 class _GoldPop extends StatefulWidget {
-  const _GoldPop({super.key, required this.text, required this.onFinished});
+  const _GoldPop({
+    super.key,
+    required this.text,
+    required this.onFinished,
+    this.crit = false,
+  });
 
   final String text;
   final VoidCallback onFinished;
+  final bool crit;
 
   @override
   State<_GoldPop> createState() => _GoldPopState();
@@ -654,8 +695,8 @@ class _GoldPopState extends State<_GoldPop> {
         },
         child: Text(
           widget.text,
-          style: const TextStyle(
-            color: cyan,
+          style: TextStyle(
+            color: widget.crit ? crimson : cyan,
             fontSize: 22,
             fontWeight: FontWeight.w800,
           ),
@@ -666,7 +707,8 @@ class _GoldPopState extends State<_GoldPop> {
 }
 
 class _Pop {
-  _Pop(this.id, this.amount);
+  _Pop(this.id, this.amount, this.crit);
   final int id;
-  final int amount;
+  final double amount;
+  final bool crit;
 }

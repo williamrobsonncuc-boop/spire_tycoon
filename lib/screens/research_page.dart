@@ -22,7 +22,7 @@ class ResearchPage extends StatelessWidget {
       '+5% gold per level. Paid with Compliance Points.',
       '+1 hour of offline pay per level, up to 24. Paid with Shareholder Equity.',
       'Builds cost 3% less per level, up to 30%. Paid with Compliance Points.',
-      'Taps are worth 2% more per level. Paid with Shareholder Equity.',
+      'Taps are worth 2% more per level, and crit chance rises by 1%. Paid with Shareholder Equity.',
     ];
     return Scaffold(
       backgroundColor: navy,
