@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'dart:math';
+
 import 'package:spire_tycoon/game/achievements.dart';
+import 'package:spire_tycoon/game/events.dart';
 import 'package:spire_tycoon/game/floor_catalog.dart';
 import 'package:spire_tycoon/game/formulas.dart';
 import 'package:spire_tycoon/game/market.dart';
@@ -821,6 +825,155 @@ void main() {
     expect(game.researchLevel(0), 0);
     expect(offlineCapFor(100), const Duration(hours: 24));
   });
+
+  test(
+    'office events pay, pause, or double, and a bad name is ignored',
+    () async {
+      final courier = GameModel(
+        enableIdleTicks: false,
+        eventGap: 1,
+        random: _QueueRandom([0]),
+      );
+      addTearDown(courier.dispose);
+      courier.floors[0] = FloorProgress(running: true);
+      courier.advanceOneSecond();
+      expect(courier.officeEvent, OfficeEvent.courier);
+      courier.resolveOfficeEvent();
+      expect(courier.gold, closeTo(5.2, 0.001));
+      courier.resolveOfficeEvent();
+      expect(courier.gold, closeTo(5.2, 0.001));
+
+      final outage = GameModel(
+        enableIdleTicks: false,
+        eventGap: 1,
+        random: _QueueRandom([3]),
+      );
+      addTearDown(outage.dispose);
+      outage.floors[0] = FloorProgress(running: true);
+      outage.advanceOneSecond();
+      expect(outage.officeEvent, OfficeEvent.outage);
+      final paused = outage.gold;
+      outage.advanceOneSecond();
+      expect(outage.gold, paused);
+      expect(outage.liveGoldPerSecond, 0);
+      outage.resolveOfficeEvent();
+      expect(outage.officeEvent, isNull);
+      outage.advanceOneSecond();
+      expect(outage.gold, greaterThan(paused));
+
+      var clock = DateTime.utc(2026, 3, 1, 12);
+      final boom = GameModel(
+        enableIdleTicks: false,
+        eventGap: 1,
+        now: () => clock,
+        random: _QueueRandom([1]),
+      );
+      addTearDown(boom.dispose);
+      boom.floors[0] = FloorProgress(running: true);
+      boom.advanceOneSecond();
+      expect(boom.officeEvent, OfficeEvent.boom);
+      expect(boom.gold, closeTo(0.2, 0.001));
+      clock = clock.add(const Duration(seconds: 1));
+      boom.advanceOneSecond();
+      expect(boom.gold, closeTo(0.6, 0.001));
+      expect(boom.liveGoldPerSecond, closeTo(0.4, 0.001));
+      boom.resolveOfficeEvent();
+      expect(boom.officeEvent, OfficeEvent.boom);
+      clock = clock.add(const Duration(seconds: 60));
+      boom.advanceOneSecond();
+      expect(boom.gold, closeTo(0.8, 0.001));
+
+      final rich = GameModel(enableIdleTicks: false);
+      addTearDown(rich.dispose);
+      rich.floors[0] = FloorProgress(level: 1000000000, running: true);
+      rich.officeEvent = OfficeEvent.party;
+      expect(rich.eventPayout, 1e12);
+      rich.resolveOfficeEvent();
+      expect(rich.gold, 1e12);
+
+      SharedPreferences.setMockInitialValues({});
+      final saved = GameModel(
+        enableIdleTicks: false,
+        eventGap: 1,
+        random: _QueueRandom([0]),
+      );
+      addTearDown(saved.dispose);
+      await saved.load();
+      saved.advanceOneSecond();
+      expect(saved.officeEvent, OfficeEvent.courier);
+      await saved.persist();
+
+      final loaded = GameModel(enableIdleTicks: false);
+      addTearDown(loaded.dispose);
+      await loaded.load();
+      expect(loaded.officeEvent, OfficeEvent.courier);
+
+      final prefs = await SharedPreferences.getInstance();
+      final map = jsonDecode(prefs.getString(saveKey)!) as Map<String, dynamic>;
+      map['event'] = 4;
+      map['eventWait'] = -5;
+      await prefs.setString(saveKey, jsonEncode(map));
+      final weird = GameModel(enableIdleTicks: false);
+      addTearDown(weird.dispose);
+      await weird.load();
+      expect(weird.officeEvent, isNull);
+
+      final reset = GameModel(
+        enableIdleTicks: false,
+        eventGap: 1,
+        random: _QueueRandom([3]),
+      );
+      addTearDown(reset.dispose);
+      reset.floors[0] = FloorProgress(running: true);
+      reset.floors[2] = FloorProgress(running: true);
+      reset.advanceOneSecond();
+      expect(reset.officeEvent, OfficeEvent.outage);
+      reset.restructure();
+      expect(reset.officeEvent, isNull);
+    },
+  );
+
+  testWidgets('an office event note fits a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    await tester.pumpWidget(SpireTycoonApp(game: game));
+    await _pumpUntilReady(tester);
+    await _acceptAppointment(tester);
+    game.officeEvent = OfficeEvent.outage;
+    game.notifyListeners();
+    await tester.pump();
+    expect(find.byKey(const Key('office-event')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('office-event')));
+    await tester.pump();
+    expect(game.officeEvent, isNull);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _QueueRandom implements Random {
+  _QueueRandom(this.values);
+
+  final List<int> values;
+  int index = 0;
+
+  @override
+  int nextInt(int max) {
+    final value = values[index % values.length];
+    index += 1;
+    return value % max;
+  }
+
+  @override
+  double nextDouble() => 0;
+
+  @override
+  bool nextBool() => false;
 }
 
 void _useTallWindow(WidgetTester tester) {

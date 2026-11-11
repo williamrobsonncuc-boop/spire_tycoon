@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../game/events.dart';
 import '../game/formulas.dart';
 import '../game/game_model.dart';
 import '../theme/app_colors.dart';
@@ -105,61 +106,6 @@ class _TowerPageState extends State<TowerPage> {
                       child: Column(
                         children: [
                           _TowerHeader(game: game),
-                          if (game.districtNotice != null) ...[
-                            const SizedBox(height: 8),
-                            Material(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(cornerRadius),
-                              child: InkWell(
-                                key: const Key('district-notice'),
-                                borderRadius: BorderRadius.circular(
-                                  cornerRadius,
-                                ),
-                                onTap: game.dismissDistrictNotice,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Text(
-                                    game.districtNotice!,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: cyan,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (game.celebration != null) ...[
-                            const SizedBox(height: 8),
-                            Material(
-                              color: emerald,
-                              borderRadius: BorderRadius.circular(cornerRadius),
-                              child: InkWell(
-                                key: const Key('celebration'),
-                                borderRadius: BorderRadius.circular(
-                                  cornerRadius,
-                                ),
-                                onTap: game.dismissCelebration,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Text(
-                                    game.celebration!,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: cream,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (game.tutorialStep > 0 &&
-                              game.tutorialStep < 4) ...[
-                            const SizedBox(height: 8),
-                            _TutorialBanner(game: game),
-                          ],
                           const SizedBox(height: 12),
                           Expanded(
                             child: NotificationListener<ScrollNotification>(
@@ -171,9 +117,17 @@ class _TowerPageState extends State<TowerPage> {
                               },
                               child: ListView.builder(
                                 key: const Key('tower-list'),
-                                itemCount: _shown,
+                                // The first row is notes, so they scroll instead
+                                // of pushing the tower off a short screen.
+                                itemCount: _shown + 1,
                                 itemBuilder: (context, index) {
-                                  return FloorCard(game: game, index: index);
+                                  if (index == 0) {
+                                    return _TowerNotes(game: game);
+                                  }
+                                  return FloorCard(
+                                    game: game,
+                                    index: index - 1,
+                                  );
                                 },
                               ),
                             ),
@@ -190,6 +144,94 @@ class _TowerPageState extends State<TowerPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _TowerNotes extends StatelessWidget {
+  const _TowerNotes({required this.game});
+
+  final GameModel game;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (game.districtNotice != null) ...[
+          Material(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(cornerRadius),
+            child: InkWell(
+              key: const Key('district-notice'),
+              borderRadius: BorderRadius.circular(cornerRadius),
+              onTap: game.dismissDistrictNotice,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  game.districtNotice!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: cyan,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (game.officeEvent != null) ...[
+          Material(
+            color: slate,
+            borderRadius: BorderRadius.circular(cornerRadius),
+            child: InkWell(
+              key: const Key('office-event'),
+              borderRadius: BorderRadius.circular(cornerRadius),
+              onTap: game.officeEvent == OfficeEvent.boom
+                  ? null
+                  : game.resolveOfficeEvent,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  game.eventLine,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: cream,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (game.celebration != null) ...[
+          Material(
+            color: emerald,
+            borderRadius: BorderRadius.circular(cornerRadius),
+            child: InkWell(
+              key: const Key('celebration'),
+              borderRadius: BorderRadius.circular(cornerRadius),
+              onTap: game.dismissCelebration,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  game.celebration!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: cream,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (game.tutorialStep > 0 && game.tutorialStep < 4)
+          _TutorialBanner(game: game),
+      ],
     );
   }
 }
@@ -353,7 +395,7 @@ class _TowerHeader extends StatelessWidget {
             style: const TextStyle(color: cream, fontSize: 15),
           ),
           Text(
-            '+${formatNumber(game.goldPerSecond)} per second',
+            '+${formatNumber(game.liveGoldPerSecond)} per second',
             key: const Key('gold-per-second'),
             style: const TextStyle(color: cream, fontSize: 15),
           ),

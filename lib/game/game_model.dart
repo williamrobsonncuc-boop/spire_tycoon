@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'achievements.dart';
 import 'dialogue.dart';
+import 'events.dart';
 import 'floor_catalog.dart';
 import 'formulas.dart';
 import 'managers.dart';
@@ -76,9 +77,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     this.enableIdleTicks = true,
     this.clogChance = 0.03,
     this.crisisChance = 0.02,
+    this.eventGap = 180,
     Random? random,
   }) : _now = now ?? DateTime.now,
-       _random = random ?? Random();
+       _random = random ?? Random(),
+       _eventWait = eventGap;
 
   final DateTime Function() _now;
   final bool enableIdleTicks;
@@ -88,7 +91,17 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Chance, once a second, that a running floor's orc falls asleep.
   final double crisisChance;
+
+  /// Seconds of the game being open between office events. 0 turns them off.
+  final int eventGap;
+  int _eventWait;
   final Random _random;
+
+  /// The happening on the tower right now, if any.
+  OfficeEvent? officeEvent;
+
+  /// When a market boom ends. Other events wait for a tap.
+  int eventEndsMs = 0;
 
   double gold = 0;
   double compliance = 0;
@@ -275,6 +288,47 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       total += goldRateFor(index);
     }
     return total;
+  }
+
+  /// What the header shows. A boom doubles it. An outage shows zero.
+  double get liveGoldPerSecond {
+    if (officeEvent == OfficeEvent.outage) {
+      return 0;
+    }
+    if (officeEvent == OfficeEvent.boom) {
+      return goldPerSecond * 2;
+    }
+    return goldPerSecond;
+  }
+
+  /// Gold from tapping a courier or a party. Never tiny, never past 1T.
+  double get eventPayout {
+    final raw = goldPerSecond * 20;
+    if (raw.isNaN || raw.isInfinite || raw < 5) {
+      return 5;
+    }
+    if (raw > 1e12) {
+      return 1e12;
+    }
+    return roundMoney(raw);
+  }
+
+  String get eventLine {
+    switch (officeEvent) {
+      case OfficeEvent.courier:
+        return 'A golden goblin courier is waiting. Tap to take the pouch.';
+      case OfficeEvent.boom:
+        final leftMs = eventEndsMs - _now().millisecondsSinceEpoch;
+        final left = (leftMs / 1000).ceil();
+        final seconds = left < 0 ? 0 : left;
+        return 'Market Boom. Gold income is doubled for another $seconds seconds.';
+      case OfficeEvent.party:
+        return 'The office is having a party. Tap to take a slice of cake.';
+      case OfficeEvent.outage:
+        return 'The lights are out. Tap to restore power. Income waits until you do.';
+      case null:
+        return '';
+    }
   }
 
   double get compliancePerSecond {
@@ -735,6 +789,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     bossEndsMs = null;
     bossTarget = 0;
     _bossStake = 0;
+    officeEvent = null;
+    eventEndsMs = 0;
+    _eventWait = eventGap;
     floors
       ..clear()
       ..[0] = FloorProgress(running: true);
@@ -759,9 +816,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     prepareCalendar();
     _resolveBoss(now);
     _finishConstruction(now);
+    _expireEvent(now);
     _produce(const Duration(seconds: 1));
     _rollClogs();
     _rollSleepingOrcs();
+    _rollOfficeEvent();
     _checkAchievements();
     _lastActive = now;
     notifyListeners();
@@ -786,6 +845,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> persist() => _writeSave();
 
   void _produce(Duration elapsed) {
+    if (officeEvent == OfficeEvent.outage) {
+      return;
+    }
     final seconds = elapsed.inMilliseconds / 1000;
     if (seconds <= 0) {
       return;
@@ -809,6 +871,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       } else {
         goldGain += goldRateFor(index) * seconds;
       }
+    }
+    if (officeEvent == OfficeEvent.boom && goldGain > 0) {
+      goldGain *= 2;
     }
     if (goldGain > 0) {
       gold = roundMoney(gold + goldGain);
@@ -1003,6 +1068,46 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _expireEvent(DateTime now) {
+    if (officeEvent == OfficeEvent.boom &&
+        now.millisecondsSinceEpoch >= eventEndsMs) {
+      officeEvent = null;
+      eventEndsMs = 0;
+    }
+  }
+
+  void _rollOfficeEvent() {
+    if (officeEvent != null || eventGap <= 0) {
+      return;
+    }
+    _eventWait -= 1;
+    if (_eventWait > 0) {
+      return;
+    }
+    _eventWait = eventGap;
+    final roll = _random.nextInt(OfficeEvent.values.length);
+    officeEvent = OfficeEvent.values[roll];
+    if (officeEvent == OfficeEvent.boom) {
+      eventEndsMs = _now().millisecondsSinceEpoch + 60 * 1000;
+    }
+  }
+
+  /// Collects a courier or a party, or switches the lights back on.
+  void resolveOfficeEvent() {
+    final event = officeEvent;
+    if (event == null || event == OfficeEvent.boom) {
+      return;
+    }
+    if (event == OfficeEvent.courier || event == OfficeEvent.party) {
+      final payout = eventPayout;
+      gold = roundMoney(gold + payout);
+      _creditLifetime(payout);
+    }
+    officeEvent = null;
+    eventEndsMs = 0;
+    _touch();
+  }
+
   void _rollClogs() {
     for (final entry in floors.entries) {
       if (floorKind(entry.key) != FloorKind.clog) {
@@ -1167,6 +1272,25 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
           }
         }
       }
+      final rawEvent = map['event'];
+      officeEvent = rawEvent is String ? officeEventFromName(rawEvent) : null;
+      final rawEnds = map['eventEndsMs'];
+      eventEndsMs = rawEnds is num ? rawEnds.toInt() : 0;
+      if (officeEvent == OfficeEvent.boom &&
+          eventEndsMs <= now.millisecondsSinceEpoch) {
+        officeEvent = null;
+        eventEndsMs = 0;
+      }
+      if (officeEvent != OfficeEvent.boom) {
+        eventEndsMs = 0;
+      }
+      final rawWait = map['eventWait'];
+      final wait = rawWait is num ? rawWait.toInt() : null;
+      if (wait == null || wait < 0 || wait > eventGap) {
+        _eventWait = eventGap;
+      } else {
+        _eventWait = wait;
+      }
       lastLoginDay = map['lastLoginDay'] as String? ?? '';
       pendingLoginGold = roundMoney(
         (map['pendingLoginGold'] as num?)?.toDouble() ?? 0,
@@ -1240,6 +1364,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       bossEndsMs = null;
       bossTarget = 0;
       _bossStake = 0;
+      officeEvent = null;
+      eventEndsMs = 0;
+      _eventWait = eventGap;
+      for (var i = 0; i < researchLevels.length; i++) {
+        researchLevels[i] = 0;
+      }
       floors
         ..clear()
         ..[0] = FloorProgress(running: true);
@@ -1306,6 +1436,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'weeklyBuildClaimed': weeklyBuildClaimed,
       'weeklyRecruitClaimed': weeklyRecruitClaimed,
       'research': researchLevels,
+      'event': officeEvent?.name ?? '',
+      'eventEndsMs': eventEndsMs,
+      'eventWait': _eventWait,
       'lastLoginDay': lastLoginDay,
       'pendingLoginGold': pendingLoginGold,
       'weekendWeek': weekendWeek,
