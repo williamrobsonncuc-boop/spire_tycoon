@@ -30,9 +30,11 @@ flutter run -d chrome
 - Boss floors every 25 floors. An Audit or Hostile Takeover asks you to raise income before 45 seconds run out. Clearing it pays gold and hires Karen. Missing it returns the gold.
 - Quests open with Floor 3: tap 25 times today, open a floor this week, recruit 3 staff this week. A streak freeze keeps your check-in if you miss a day. You can hold two.
 - Managers have up to 5 stars. A sixth copy becomes a Gold Ticket. The codex shows every monster, with silhouettes for ones you have not met. A finished district set adds 5% gold.
+- Research opens at floor 10. Compliance Points buy faster floors and cheaper builds. Shareholder Equity buys a longer offline cap and heavier taps. The labs stay after a restructuring.
 
 ## Changelog
 
+- Research labs. Levels are capped, a negative save level cannot go below zero, and the offline cap cannot pass 24 hours.
 - Manager stars cap at 5, and a finished district set in the codex adds 5% gold.
 - Daily and weekly quests, plus a streak freeze so one missed day does not reset the check-in.
 - Boss floors every 25 floors. A failed audit returns the gold. The prize is capped so a huge tower cannot overflow.

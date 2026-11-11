@@ -209,6 +209,43 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   double get collectionBonus =>
       1 + 0.05 * completedDistrictSets(discoveredCreatures);
 
+  /// Research levels. 0 speed, 1 offline hours, 2 cheaper builds, 3 stronger taps.
+  final List<int> researchLevels = [0, 0, 0, 0];
+
+  static const int researchCap = 10;
+
+  /// Research opens with floor 10 so the early tower is not a menu of systems.
+  bool get researchOpen => highestRunningFloor >= 9;
+
+  int researchLevel(int branch) {
+    if (branch < 0 || branch >= researchLevels.length) {
+      return 0;
+    }
+    final level = researchLevels[branch];
+    if (level < 0) {
+      return 0;
+    }
+    return level > researchCap ? researchCap : level;
+  }
+
+  bool researchUsesEquity(int branch) => branch == 1 || branch == 3;
+
+  double researchCost(int branch) {
+    final level = researchLevel(branch);
+    return positiveCost(20 * safePow(1.6, level));
+  }
+
+  double get researchSpeed => 1 + 0.05 * researchLevel(0);
+
+  Duration get offlineResearchCap => offlineCapFor(researchLevel(1));
+
+  double get researchBuildDiscount {
+    final cut = 0.03 * researchLevel(2);
+    return cut > 0.3 ? 0.3 : cut;
+  }
+
+  double get researchTapBonus => 1 + 0.02 * researchLevel(3);
+
   /// Gary's +2% speed per copy.
   double get speedBonus => 1 + 0.02 * copies(ManagerId.gary);
 
@@ -274,7 +311,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         speedBonus *
         equityMultiplier *
         milestoneSpeed(progress.level) *
-        collectionBonus;
+        collectionBonus *
+        researchSpeed;
     // Gary's first copy doubles the forge. Brutus buffs every heavy floor.
     if (index == 1 && copies(ManagerId.gary) > 0) {
       rate *= 2;
@@ -387,10 +425,18 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
     final away = now.difference(_lastActive ?? now);
     final earnedGold =
-        offlineEarnings(goldPerSecond: goldPerSecond, away: away) *
+        offlineEarnings(
+          goldPerSecond: goldPerSecond,
+          away: away,
+          cap: offlineResearchCap,
+        ) *
         offlineBonus;
     final earnedCompliance =
-        offlineEarnings(goldPerSecond: compliancePerSecond, away: away) *
+        offlineEarnings(
+          goldPerSecond: compliancePerSecond,
+          away: away,
+          cap: offlineResearchCap,
+        ) *
         offlineBonus;
     if (earnedGold > 0 || earnedCompliance > 0) {
       pendingOfflineGold = roundMoney(pendingOfflineGold + earnedGold);
@@ -534,8 +580,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   void tapLobby() {
     _syncQuests(_now());
     tapsToday += 1;
-    gold = roundMoney(gold + goldPerTap);
-    _creditLifetime(goldPerTap.toDouble());
+    final gained = goldPerTap * researchTapBonus;
+    gold = roundMoney(gold + gained);
+    _creditLifetime(gained);
     lastQuip = corporateLines[_quipIndex % corporateLines.length];
     _quipIndex += 1;
     if (tutorialStep == 1) {
@@ -551,7 +598,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (!isRunning(index - 1)) {
       return;
     }
-    final cost = floorBuildCost(index);
+    final cost = roundMoney(
+      floorBuildCost(index) * (1 - researchBuildDiscount),
+    );
     if (gold + 0.001 < cost) {
       return;
     }
@@ -880,6 +929,34 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  bool canBuyResearch(int branch) {
+    if (!researchOpen || researchLevel(branch) >= researchCap) {
+      return false;
+    }
+    final cost = researchCost(branch);
+    if (researchUsesEquity(branch)) {
+      return equity >= cost;
+    }
+    return compliance + 0.001 >= cost;
+  }
+
+  void buyResearch(int branch) {
+    if (!canBuyResearch(branch)) {
+      return;
+    }
+    final cost = researchCost(branch);
+    if (researchUsesEquity(branch)) {
+      equity -= cost.ceil();
+      if (equity < 0) {
+        equity = 0;
+      }
+    } else {
+      compliance = roundMoney(compliance - cost);
+    }
+    researchLevels[branch] = researchLevel(branch) + 1;
+    _touch();
+  }
+
   void claimDailyTaps() {
     if (!questsOpen || tapsToday < 25 || dailyTapClaimed) {
       return;
@@ -1070,6 +1147,26 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (tapsToday < 0) {
         tapsToday = 0;
       }
+      final rawResearch = map['research'];
+      if (rawResearch is List) {
+        for (
+          var i = 0;
+          i < researchLevels.length && i < rawResearch.length;
+          i++
+        ) {
+          final level = rawResearch[i];
+          if (level is num) {
+            var value = level.toInt();
+            if (value < 0) {
+              value = 0;
+            }
+            if (value > researchCap) {
+              value = researchCap;
+            }
+            researchLevels[i] = value;
+          }
+        }
+      }
       lastLoginDay = map['lastLoginDay'] as String? ?? '';
       pendingLoginGold = roundMoney(
         (map['pendingLoginGold'] as num?)?.toDouble() ?? 0,
@@ -1208,6 +1305,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       'dailyTapClaimed': dailyTapClaimed,
       'weeklyBuildClaimed': weeklyBuildClaimed,
       'weeklyRecruitClaimed': weeklyRecruitClaimed,
+      'research': researchLevels,
       'lastLoginDay': lastLoginDay,
       'pendingLoginGold': pendingLoginGold,
       'weekendWeek': weekendWeek,
@@ -1309,10 +1407,18 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
       final earnedGold =
-          offlineEarnings(goldPerSecond: goldPerSecond, away: away) *
+          offlineEarnings(
+            goldPerSecond: goldPerSecond,
+            away: away,
+            cap: offlineResearchCap,
+          ) *
           offlineBonus;
       final earnedCompliance =
-          offlineEarnings(goldPerSecond: compliancePerSecond, away: away) *
+          offlineEarnings(
+            goldPerSecond: compliancePerSecond,
+            away: away,
+            cap: offlineResearchCap,
+          ) *
           offlineBonus;
       _finishConstruction(now);
       _lastActive = now;

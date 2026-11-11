@@ -793,6 +793,34 @@ void main() {
       expect(game.goldRateFor(0), closeTo(before * 1.05, 0.001));
     },
   );
+
+  test('research is locked until floor 10 and stays after a reset', () {
+    final game = GameModel(enableIdleTicks: false);
+    addTearDown(game.dispose);
+    game.floors[0] = FloorProgress(running: true);
+    game.compliance = 1000;
+    expect(game.researchOpen, isFalse);
+    game.buyResearch(0);
+    expect(game.researchLevel(0), 0);
+
+    game.floors[9] = FloorProgress(running: true);
+    expect(game.researchOpen, isTrue);
+    final before = game.goldRateFor(0);
+    game.buyResearch(0);
+    expect(game.researchLevel(0), 1);
+    expect(game.goldRateFor(0), closeTo(before * 1.05, 0.001));
+    expect(game.compliance, lessThan(1000));
+
+    game.equity = 100;
+    game.buyResearch(1);
+    expect(game.offlineResearchCap, const Duration(hours: 9));
+    game.restructure();
+    expect(game.researchLevel(0), 1);
+    expect(game.researchLevel(1), 1);
+    game.researchLevels[0] = -4;
+    expect(game.researchLevel(0), 0);
+    expect(offlineCapFor(100), const Duration(hours: 24));
+  });
 }
 
 void _useTallWindow(WidgetTester tester) {

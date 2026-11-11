@@ -123,8 +123,16 @@ double deskUpgradeCost(int level) {
 /// tapping and this idle rate.
 double idleGoldPerSecond(int goldPerTap) => roundTenths(goldPerTap * 0.2);
 
-/// How long an absence can pay out. Longer gaps are ignored.
+/// How long an absence can pay out before research. Longer gaps are ignored.
 const Duration offlineCap = Duration(hours: 8);
+
+/// Research can add hours. The cap never goes past 24, so a bad level cannot
+/// turn one absence into a year of gold.
+Duration offlineCapFor(int extraHours) {
+  final hours = extraHours < 0 ? 0 : extraHours;
+  final capped = hours > 16 ? 16 : hours;
+  return Duration(hours: 8 + capped);
+}
 
 /// Shorter than this and we skip the welcome-back note. A quick refresh
 /// should not pop a dialog.
@@ -137,6 +145,7 @@ const Duration offlineMinimum = Duration(seconds: 30);
 double offlineEarnings({
   required double goldPerSecond,
   required Duration away,
+  Duration cap = offlineCap,
 }) {
   if (goldPerSecond.isNaN ||
       goldPerSecond.isInfinite ||
@@ -145,7 +154,7 @@ double offlineEarnings({
       away < offlineMinimum) {
     return 0;
   }
-  final counted = away > offlineCap ? offlineCap : away;
+  final counted = away > cap ? cap : away;
   final raw = goldPerSecond * counted.inSeconds;
   if (raw.isNaN || raw.isInfinite) {
     return 1e300;

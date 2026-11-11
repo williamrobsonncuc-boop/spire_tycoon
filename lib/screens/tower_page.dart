@@ -11,6 +11,7 @@ import 'achievements_page.dart';
 import 'collection_page.dart';
 import 'market_page.dart';
 import 'quests_page.dart';
+import 'research_page.dart';
 import 'shop_page.dart';
 import 'weekend_page.dart';
 
@@ -245,6 +246,17 @@ class _TowerHeader extends StatelessWidget {
                   );
                 },
                 child: const Text('Restructure'),
+              ),
+              TextButton(
+                key: const Key('open-research'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => ResearchPage(game: game),
+                    ),
+                  );
+                },
+                child: const Text('Research'),
               ),
               TextButton(
                 key: const Key('open-collection'),
